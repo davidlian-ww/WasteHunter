@@ -1,0 +1,37 @@
+<div id="observations-list">
+    {% if observations %}
+    <div class="space-y-3">
+        {% for obs in observations %}
+        <div class="bg-gray-50 rounded-lg p-4 border border-walmart-gray-border hover:shadow-md transition">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="waste-badge bg-walmart-blue text-white text-xs">
+                            {{ obs.waste_category }}
+                        </span>
+                        <span class="waste-badge severity-{{ obs.severity.lower() }} text-xs">
+                            {{ obs.severity }}
+                        </span>
+                        <span class="waste-badge status-{{ obs.status.lower().replace(' ', '-') }} text-xs">
+                            {{ obs.status }}
+                        </span>
+                    </div>
+                    <h5 class="font-bold text-gray-900">{{ obs.title }}</h5>
+                    {% if obs.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ obs.description }}</p>
+                    {% endif %}
+                    <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                        <span>👤 {{ obs.observed_by }}</span>
+                        <span>📅 {{ obs.observed_at[:10] }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+        <p>No observations yet for this step.</p>
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">TIMWOOD Waste Dashboard</h1>
+            <p class="text-gray-600 mt-1">Track and eliminate the 7 wastes across NS Fulfillment Centers</p>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div id="stats-container" hx-get="/api/stats" hx-trigger="every 30s" hx-swap="outerHTML">
+        {% include "components/stats_cards.html" %}
+    </div>
+
+    <!-- TIMWOOD Categories Info -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">📚 The 7 Wastes (TIMWOOD)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">🚛</div>
+                <h3 class="font-bold text-walmart-blue">Transportation</h3>
+                <p class="text-sm text-gray-600 mt-1">Unnecessary movement of products or materials</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">📦</div>
+                <h3 class="font-bold text-walmart-blue">Inventory</h3>
+                <p class="text-sm text-gray-600 mt-1">Excess products or materials not being processed</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">🚶</div>
+                <h3 class="font-bold text-walmart-blue">Motion</h3>
+                <p class="text-sm text-gray-600 mt-1">Unnecessary movement of people or equipment</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">⏱️</div>
+                <h3 class="font-bold text-walmart-blue">Waiting</h3>
+                <p class="text-sm text-gray-600 mt-1">Idle time when resources aren't being utilized</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">📊</div>
+                <h3 class="font-bold text-walmart-blue">Overproduction</h3>
+                <p class="text-sm text-gray-600 mt-1">Producing more than needed or before needed</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">⚙️</div>
+                <h3 class="font-bold text-walmart-blue">Over-processing</h3>
+                <p class="text-sm text-gray-600 mt-1">More work than required by customer</p>
+            </div>
+            <div class="border border-walmart-gray-border rounded-lg p-4 hover:shadow-md transition">
+                <div class="text-3xl mb-2">❌</div>
+                <h3 class="font-bold text-walmart-blue">Defects</h3>
+                <p class="text-sm text-gray-600 mt-1">Work that contains errors or rework</p>
+            </div>
+            <div class="border-2 border-walmart-spark bg-walmart-spark bg-opacity-10 rounded-lg p-4">
+                <div class="text-3xl mb-2">🎯</div>
+                <h3 class="font-bold text-walmart-warning">Goal</h3>
+                <p class="text-sm text-gray-700 mt-1 font-medium">Eliminate waste, maximize value!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Observations -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-900">Recent Waste Observations</h2>
+            <div class="flex space-x-2">
+                <select 
+                    class="px-3 py-2 border border-walmart-gray-border rounded-md text-sm focus:ring-2 focus:ring-walmart-blue focus:border-transparent"
+                    hx-get="/api/observations/filter"
+                    hx-target="#observations-table"
+                    hx-trigger="change"
+                    name="category"
+                >
+                    <option value="">All Categories</option>
+                    {% for category in waste_categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <select 
+                    class="px-3 py-2 border border-walmart-gray-border rounded-md text-sm focus:ring-2 focus:ring-walmart-blue focus:border-transparent"
+                    hx-get="/api/observations/filter"
+                    hx-target="#observations-table"
+                    hx-trigger="change"
+                    name="status"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
+        </div>
+        <div id="observations-table">
+            {% include "components/observations_table.html" %}
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <a href="/sites" class="bg-walmart-blue hover:bg-walmart-blue-hover text-white rounded-lg p-6 text-center transition shadow-md hover:shadow-lg">
+            <div class="text-4xl mb-2">🏭</div>
+            <h3 class="text-lg font-bold">Manage Sites</h3>
+            <p class="text-sm mt-1 opacity-90">Add or view NS FCs</p>
+        </a>
+        <a href="/paths" class="bg-walmart-green hover:bg-green-700 text-white rounded-lg p-6 text-center transition shadow-md hover:shadow-lg">
+            <div class="text-4xl mb-2">🛤️</div>
+            <h3 class="text-lg font-bold">Process Paths</h3>
+            <p class="text-sm mt-1 opacity-90">Create and manage process flows</p>
+        </a>
+        <div class="bg-walmart-spark hover:bg-walmart-spark-hover text-walmart-warning rounded-lg p-6 text-center transition shadow-md hover:shadow-lg cursor-pointer">
+            <div class="text-4xl mb-2">📊</div>
+            <h3 class="text-lg font-bold">Analytics</h3>
+            <p class="text-sm mt-1">View waste trends (Coming Soon)</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

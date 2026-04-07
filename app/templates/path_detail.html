@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+                <div class="flex items-center space-x-3 mb-2">
+                    <a href="/paths" class="text-walmart-blue hover:text-walmart-blue-hover">← Back to Paths</a>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ path.name }}</h1>
+                <p class="text-gray-600">{{ path.description or 'No description provided' }}</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-6 text-sm text-gray-600">
+            <span class="flex items-center space-x-2">
+                <span>🏭</span>
+                <span><strong>Site:</strong> {{ path.site_name }} ({{ path.site_code }})</span>
+            </span>
+            <span class="flex items-center space-x-2">
+                <span>👤</span>
+                <span><strong>Created by:</strong> {{ path.created_by }}</span>
+            </span>
+            <span class="flex items-center space-x-2">
+                <span>📅</span>
+                <span>{{ path.created_at[:10] }}</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Add Step Section -->
+    <div class="bg-walmart-spark bg-opacity-10 border-2 border-walmart-spark rounded-lg p-6">
+        <h2 class="text-lg font-bold text-walmart-warning mb-4">➕ Add Process Step</h2>
+        <form hx-post="/paths/{{ path.id }}/steps" hx-target="#steps-list" hx-swap="innerHTML">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-1">
+                    <input 
+                        type="text" 
+                        name="name" 
+                        required
+                        placeholder="Step name (e.g., Unload Truck)"
+                        class="w-full px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue">
+                </div>
+                <div class="md:col-span-2 flex space-x-2">
+                    <input 
+                        type="text" 
+                        name="description"
+                        placeholder="Step description (optional)"
+                        class="flex-1 px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue">
+                    <button 
+                        type="submit"
+                        class="bg-walmart-green hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition whitespace-nowrap">
+                        Add Step
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Process Steps -->
+    <div id="steps-list">
+        {% include "components/steps_list.html" %}
+    </div>
+</div>
+
+<!-- Add Observation Modal (reusable) -->
+<div id="addObservationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-900">Add Waste Observation</h2>
+                <button 
+                    onclick="document.getElementById('addObservationModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="observationForm" hx-post="/observations/create" hx-swap="none">
+                <input type="hidden" name="step_id" id="modal_step_id">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Waste Category <span class="text-walmart-red">*</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-3">
+                            {% for category in waste_categories %}
+                            <label class="flex items-center space-x-3 p-3 border-2 border-walmart-gray-border rounded-lg hover:border-walmart-blue cursor-pointer transition">
+                                <input type="radio" name="waste_category" value="{{ category }}" required class="text-walmart-blue focus:ring-walmart-blue">
+                                <span class="text-sm font-medium">{{ category }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="obs_title" class="block text-sm font-medium text-gray-700 mb-1">
+                            Title <span class="text-walmart-red">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="obs_title" 
+                            name="title" 
+                            required
+                            placeholder="Brief description of the waste"
+                            class="w-full px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue">
+                    </div>
+                    
+                    <div>
+                        <label for="obs_description" class="block text-sm font-medium text-gray-700 mb-1">
+                            Detailed Description
+                        </label>
+                        <textarea 
+                            id="obs_description" 
+                            name="description"
+                            rows="4"
+                            placeholder="Detailed description of the waste observation..."
+                            class="w-full px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="obs_severity" class="block text-sm font-medium text-gray-700 mb-1">
+                            Severity <span class="text-walmart-red">*</span>
+                        </label>
+                        <select 
+                            id="obs_severity" 
+                            name="severity"
+                            required
+                            class="w-full px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue">
+                            <option value="Low">Low - Minor impact</option>
+                            <option value="Medium" selected>Medium - Moderate impact</option>
+                            <option value="High">High - Significant impact</option>
+                            <option value="Critical">Critical - Severe impact</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="obs_observed_by" class="block text-sm font-medium text-gray-700 mb-1">
+                            Observed By
+                        </label>
+                        <input 
+                            type="text" 
+                            id="obs_observed_by" 
+                            name="observed_by"
+                            value="User"
+                            placeholder="Your name"
+                            class="w-full px-4 py-2 border border-walmart-gray-border rounded-lg focus:ring-2 focus:ring-walmart-blue">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex space-x-3">
+                    <button 
+                        type="submit"
+                        class="flex-1 bg-walmart-red hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition">
+                        Report Waste
+                    </button>
+                    <button 
+                        type="button"
+                        onclick="document.getElementById('addObservationModal').classList.add('hidden')"
+                        class="px-6 py-3 border border-walmart-gray-border rounded-lg font-semibold hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openObservationModal(stepId) {
+        document.getElementById('modal_step_id').value = stepId;
+        document.getElementById('addObservationModal').classList.remove('hidden');
+    }
+    
+    // Handle form submission with reload
+    document.getElementById('observationForm').addEventListener('htmx:afterRequest', function(event) {
+        if (event.detail.successful) {
+            document.getElementById('addObservationModal').classList.add('hidden');
+            document.getElementById('observationForm').reset();
+            // Reload the page to show new observation
+            window.location.reload();
+        }
+    });
+</script>
+{% endblock %}

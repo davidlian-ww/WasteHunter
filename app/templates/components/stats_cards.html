@@ -1,0 +1,67 @@
+<div id="stats-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Total Sites -->
+    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-walmart-blue">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase">Total Sites</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total_sites }}</p>
+            </div>
+            <div class="text-4xl">🏭</div>
+        </div>
+    </div>
+
+    <!-- Total Process Paths -->
+    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-walmart-green">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase">Process Paths</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total_paths }}</p>
+            </div>
+            <div class="text-4xl">🛤️</div>
+        </div>
+    </div>
+
+    <!-- Total Observations -->
+    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-walmart-spark">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase">Observations</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total_observations }}</p>
+            </div>
+            <div class="text-4xl">📋</div>
+        </div>
+    </div>
+
+    <!-- Open Issues -->
+    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-walmart-red">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase">Open Issues</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.open_observations }}</p>
+            </div>
+            <div class="text-4xl">⚠️</div>
+        </div>
+    </div>
+</div>
+
+<!-- Waste Distribution Chart -->
+{% if stats.waste_by_category %}
+<div class="bg-white rounded-lg shadow-md p-6 mt-6">
+    <h3 class="text-lg font-bold text-gray-900 mb-4">Waste Distribution by Category</h3>
+    <div class="space-y-3">
+        {% for item in stats.waste_by_category %}
+        <div>
+            <div class="flex justify-between text-sm mb-1">
+                <span class="font-medium text-gray-700">{{ item.waste_category }}</span>
+                <span class="text-gray-600">{{ item.count }} observations</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div class="bg-walmart-blue h-2.5 rounded-full" 
+                     style="width: {{ (item.count / stats.total_observations * 100) | round(1) }}%">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

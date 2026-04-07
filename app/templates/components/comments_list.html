@@ -1,0 +1,25 @@
+{% if comments %}
+<div class="space-y-4">
+    {% for comment in comments %}
+    <div class="bg-white border border-walmart-gray-border rounded-lg p-4">
+        <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0 w-10 h-10 bg-walmart-blue text-white rounded-full flex items-center justify-center font-bold">
+                {{ comment.author[0].upper() }}
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center space-x-2 mb-1">
+                    <span class="font-semibold text-gray-900">{{ comment.author }}</span>
+                    <span class="text-xs text-gray-500">{{ comment.created_at[:16].replace('T', ' at ') }}</span>
+                </div>
+                <p class="text-gray-700 whitespace-pre-wrap">{{ comment.comment }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8 text-gray-500">
+    <p class="text-4xl mb-2">💬</p>
+    <p>No comments yet. Be the first to comment!</p>
+</div>
+{% endif %}

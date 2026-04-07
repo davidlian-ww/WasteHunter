@@ -1,0 +1,78 @@
+{% if steps %}
+<div class="space-y-4">
+    {% for step in steps %}
+    <div class="bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-walmart-blue">
+        <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-walmart-blue text-white rounded-full flex items-center justify-center font-bold">
+                        {{ step.step_order }}
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900">{{ step.name }}</h3>
+                        {% if step.description %}
+                        <p class="text-sm text-gray-600 mt-1">{{ step.description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <button 
+                    onclick="openObservationModal({{ step.id }})"
+                    class="bg-walmart-red hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+                    + Report Waste
+                </button>
+            </div>
+            
+            <!-- Observations for this step -->
+            {% if step.observations %}
+            <div class="mt-4 space-y-3 border-t border-walmart-gray-border pt-4">
+                <h4 class="text-sm font-semibold text-gray-700 uppercase">Waste Observations ({{ step.observations|length }})</h4>
+                {% for obs in step.observations %}
+                <div class="bg-gray-50 rounded-lg p-4 border border-walmart-gray-border hover:shadow-md transition">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="waste-badge bg-walmart-blue text-white text-xs">
+                                    {{ obs.waste_category }}
+                                </span>
+                                <span class="waste-badge severity-{{ obs.severity.lower() }} text-xs">
+                                    {{ obs.severity }}
+                                </span>
+                                <span class="waste-badge status-{{ obs.status.lower().replace(' ', '-') }} text-xs">
+                                    {{ obs.status }}
+                                </span>
+                            </div>
+                            <h5 class="font-bold text-gray-900">{{ obs.title }}</h5>
+                            {% if obs.description %}
+                            <p class="text-sm text-gray-600 mt-1">{{ obs.description }}</p>
+                            {% endif %}
+                            <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                <span>👤 {{ obs.observed_by }}</span>
+                                <span>📅 {{ obs.observed_at[:10] }}</span>
+                                <span>💬 {{ obs.comment_count }} comments</span>
+                            </div>
+                        </div>
+                        <a href="/observations/{{ obs.id }}" 
+                           class="ml-4 text-walmart-blue hover:text-walmart-blue-hover font-semibold text-sm whitespace-nowrap">
+                            View →
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="mt-4 text-center py-8 bg-gray-50 rounded-lg border border-dashed border-walmart-gray-border">
+                <p class="text-gray-500 text-sm">No waste observations for this step yet.</p>
+                <p class="text-xs text-gray-400 mt-1">Click "Report Waste" to add an observation</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow-md p-12 text-center">
+    <div class="text-6xl mb-4">📋</div>
+    <h3 class="text-xl font-bold text-gray-900 mb-2">No Process Steps Yet</h3>
+    <p class="text-gray-600">Add your first step above to start building the process flow!</p>
+</div>
+{% endif %}

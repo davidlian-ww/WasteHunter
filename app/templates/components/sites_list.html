@@ -1,0 +1,43 @@
+<div class="bg-white rounded-lg shadow-md overflow-hidden">
+    {% if sites %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+        {% for site in sites %}
+        <div class="border border-walmart-gray-border rounded-lg p-6 hover:shadow-lg transition">
+            <div class="flex items-start justify-between mb-4">
+                <div class="text-4xl">🏭</div>
+                <span class="px-3 py-1 bg-walmart-blue text-white text-xs font-semibold rounded-full">
+                    {{ site.type }}
+                </span>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">{{ site.name }}</h3>
+            <div class="space-y-2 text-sm text-gray-600 mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold">Code:</span>
+                    <span class="px-2 py-1 bg-walmart-gray-light rounded text-gray-900 font-mono">{{ site.code }}</span>
+                </div>
+                {% if site.location %}
+                <div class="flex items-center space-x-2">
+                    <span>📍</span>
+                    <span>{{ site.location }}</span>
+                </div>
+                {% endif %}
+                <div class="flex items-center space-x-2 text-xs text-gray-500">
+                    <span>🕐</span>
+                    <span>Created {{ site.created_at[:10] }}</span>
+                </div>
+            </div>
+            <a href="/paths?site_id={{ site.id }}" 
+               class="block w-full text-center bg-walmart-green hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition">
+                View Process Paths
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        <div class="text-6xl mb-4">🏗️</div>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">No Sites Yet</h3>
+        <p class="text-gray-600">Create your first site to get started with TIMWOOD waste tracking!</p>
+    </div>
+    {% endif %}
+</div>
