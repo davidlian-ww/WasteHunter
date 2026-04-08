@@ -1,5 +1,5 @@
 """Main FastAPI application for TIMWOOD Waste Dashboard with FMA Analysis"""
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -18,6 +18,7 @@ from app.database import (
     get_path_details, WASTE_CATEGORIES, create_failure_mode, get_failure_mode,
     update_failure_mode, calculate_rpn, get_fma_analytics,
     quick_log_observation, get_all_process_path_names, get_recent_observations,
+    import_from_forms_csv,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -349,6 +350,30 @@ async def update_mitigation(
     fm = get_failure_mode(obs_id)
     return templates.TemplateResponse(request, "components/mitigation_status.html", {
         "failure_mode": fm,
+    })
+
+
+# ── CSV IMPORT (Microsoft Forms export) ───────────────────────────────
+@app.post("/import-csv", response_class=HTMLResponse)
+async def import_csv(request: Request, file: UploadFile = File(...)):
+    """Accept a Microsoft Forms CSV export and bulk-import all rows."""
+    if not file.filename.endswith(".csv"):
+        return HTMLResponse(
+            '<div class="text-red-600 text-sm font-semibold">Please upload a .csv file.</div>',
+            status_code=400,
+        )
+    csv_bytes = await file.read()
+    imported, skipped, errors = import_from_forms_csv(csv_bytes)
+    stats = get_dashboard_stats()
+    return templates.TemplateResponse(request, "components/import_result.html", {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+        "observations": get_recent_observations(),
+        "path_names": get_all_process_path_names(),
+        "total_observations": stats["total_observations"],
+        "open_observations": stats["open_observations"],
+        "total_paths": stats["total_paths"],
     })
 
 

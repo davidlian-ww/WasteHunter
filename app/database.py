@@ -1,8 +1,10 @@
 """Database setup and models for TIMWOOD Waste Dashboard with FMA Analysis"""
+import csv
+import io
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 
 DB_PATH = "timwood.db"
 
@@ -629,6 +631,94 @@ def get_recent_observations(limit: int = 50) -> List[Dict[str, Any]]:
         for obs in observations:
             obs["comments"] = get_comments(obs["id"])
         return observations
+
+
+# ── MICROSOFT FORMS CSV IMPORT ─────────────────────────────────────
+# Column aliases: keys are what we look for (lowercase), value is our field.
+_COL_MAP = {
+    "process path":      "process_path",
+    "waste category":    "waste_category",
+    "observation title": "title",
+    "details":           "description",
+    "severity":          "severity",
+    "your name":         "observed_by",
+    "initial comment / notes": "initial_comment",
+    "initial comment":   "initial_comment",
+    "notes":             "initial_comment",
+    "comment":           "initial_comment",
+}
+
+_VALID_CATEGORIES = {
+    "transportation", "inventory", "motion", "waiting",
+    "overproduction", "over-processing", "defects",
+}
+_VALID_SEVERITIES = {"low", "medium", "high", "critical"}
+
+
+def import_from_forms_csv(csv_bytes: bytes) -> Tuple[int, int, List[str]]:
+    """Parse a Microsoft Forms CSV export and import each row as an FMO.
+
+    Returns: (imported_count, skipped_count, list_of_error_messages)
+    """
+    text = csv_bytes.decode("utf-8-sig")  # strip BOM that Excel adds
+    reader = csv.DictReader(io.StringIO(text))
+
+    imported, skipped = 0, 0
+    errors: List[str] = []
+
+    for row_num, raw_row in enumerate(reader, start=2):  # row 1 = header
+        # Build a lowercase-key dict for fuzzy column matching
+        row = {k.strip().lower(): v.strip() for k, v in raw_row.items() if k}
+
+        # Map columns
+        mapped: Dict[str, str] = {}
+        for col_key, field in _COL_MAP.items():
+            for raw_key, val in row.items():
+                if col_key in raw_key:
+                    mapped.setdefault(field, val)
+
+        # Required fields check
+        missing = [f for f in ("process_path", "waste_category", "title") if not mapped.get(f)]
+        if missing:
+            skipped += 1
+            errors.append(f"Row {row_num}: missing {', '.join(missing)} — skipped.")
+            continue
+
+        # Validate category
+        cat = mapped["waste_category"]
+        if cat.lower() not in _VALID_CATEGORIES:
+            # Try to fuzzy-match first letter
+            letter = cat[0].upper() if cat else ""
+            letter_map = {"T": "Transportation", "I": "Inventory", "M": "Motion",
+                          "W": "Waiting", "O": "Overproduction", "D": "Defects"}
+            cat = letter_map.get(letter, "Waiting")
+        else:
+            # Normalize capitalisation
+            cat = next(c for c in WASTE_CATEGORIES if c.lower() == cat.lower())
+
+        # Validate severity
+        sev = mapped.get("severity", "Medium")
+        if sev.lower() not in _VALID_SEVERITIES:
+            sev = "Medium"
+        else:
+            sev = sev.capitalize()
+
+        try:
+            quick_log_observation(
+                process_path=mapped["process_path"],
+                waste_category=cat,
+                title=mapped["title"],
+                description=mapped.get("description", ""),
+                severity=sev,
+                observed_by=mapped.get("observed_by", "Forms Import") or "Forms Import",
+                initial_comment=mapped.get("initial_comment", ""),
+            )
+            imported += 1
+        except Exception as exc:
+            skipped += 1
+            errors.append(f"Row {row_num}: import failed — {exc}")
+
+    return imported, skipped, errors
 
 
 def get_path_details(path_id: int) -> Optional[Dict[str, Any]]:

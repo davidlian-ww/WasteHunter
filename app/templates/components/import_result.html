@@ -1,0 +1,51 @@
+{# Returned by POST /import-csv
+   Main body  → replaces #feed-container
+   OOB spans  → refresh stats + result banner
+#}
+
+{# OOB: result banner #}
+<div id="import-result" hx-swap-oob="true">
+  {% if imported > 0 %}
+  <div class="flex items-start gap-3 p-4 rounded-xl text-sm"
+       style="background:#f0fdf4;border:1px solid #86efac">
+    <span class="text-xl leading-none">✅</span>
+    <div>
+      <div class="font-bold text-green-800">
+        {{ imported }} observation{{ 's' if imported != 1 else '' }} imported!
+      </div>
+      {% if skipped > 0 %}
+      <div class="text-green-700 text-xs mt-0.5">
+        {{ skipped }} row{{ 's' if skipped != 1 else '' }} skipped.
+      </div>
+      {% endif %}
+      {% if errors %}
+      <details class="text-xs text-green-700 mt-1">
+        <summary class="cursor-pointer hover:underline">Show skipped rows</summary>
+        <ul class="mt-1 space-y-0.5 list-disc list-inside">
+          {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="flex items-start gap-3 p-4 rounded-xl text-sm"
+       style="background:#fef2f2;border:1px solid #fca5a5">
+    <span class="text-xl leading-none">⚠️</span>
+    <div class="font-bold text-red-700">
+      No rows imported. Check the CSV columns match the TIMWOOD form template.
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# OOB: KPI stats #}
+<span id="stat-total" hx-swap-oob="true">{{ total_observations }}</span>
+<span id="stat-open"  hx-swap-oob="true">{{ open_observations }}</span>
+<span id="stat-paths" hx-swap-oob="true">{{ total_paths }}</span>
+<datalist id="path-list" hx-swap-oob="true">
+  {% for name in path_names %}<option value="{{ name }}">{% endfor %}
+</datalist>
+
+{# Main body → replaces #feed-container (include the whole feed template) #}
+{% include "components/observations_feed.html" %}
