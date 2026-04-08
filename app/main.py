@@ -5,6 +5,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import json
+import socket
+import base64
+import io
+import qrcode
 
 from app.database import (
     init_db, get_all_sites, create_site, get_process_paths,
@@ -29,6 +33,42 @@ async def startup():
 @app.get("/health")
 async def health():
     return {"status": "OK"}
+
+
+def _lan_ip() -> str:
+    """Best-effort LAN IP — falls back to localhost."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def _make_qr_b64(url: str) -> str:
+    """Generate QR code PNG and return as base64 data URI."""
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0053e2", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+# ── SHARE PAGE ───────────────────────────────────────────────────
+@app.get("/share", response_class=HTMLResponse)
+async def share_page(request: Request):
+    """Shareable QR page — show this on your screen for floor leaders to scan."""
+    ip = _lan_ip()
+    url = f"http://{ip}:8001"
+    return templates.TemplateResponse(request, "share.html", {
+        "url": url,
+        "ip": ip,
+        "qr_b64": _make_qr_b64(url),
+    })
 
 
 # ── MAIN DASHBOARD ────────────────────────────────────────────────
