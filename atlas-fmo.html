@@ -464,35 +464,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
       <span class="hdr-brand">NS FMO Audit</span>
       <span id="offline-badge" class="hdr-badge" style="background:rgba(234,17,0,.7);display:none">🟥 Offline</span>
     </div>
-    <h1>🔗 Share This App</h1>
-    <p>Let anyone scan, install &amp; use — no login needed</p>
+    <h1>🔗 Share with Your Team</h1>
+    <p>No PC needed — works on any phone, any time</p>
   </div>
   <div class="content">
 
-    <!-- QR card -->
-    <div class="card" style="text-align:center;padding:20px 20px 14px">
-      <div id="qr-wrap" style="display:inline-block;padding:10px;border-radius:12px;border:3px solid var(--blue);margin-bottom:10px">
-        <img id="qr-img" alt="App QR code" width="200" height="200"
-             style="display:block;border-radius:4px"
-             onerror="this.style.display='none';document.getElementById('qr-fallback').style.display='flex'">
-        <div id="qr-fallback" style="display:none;width:200px;height:200px;background:#f1f5f9;
-             border-radius:8px;align-items:center;justify-content:center;flex-direction:column">
-          <div style="font-size:2.5rem">📸</div>
-          <p style="font-size:.72rem;color:var(--muted);margin-top:6px">QR requires internet</p>
+    <!-- How it works — 3-step reassurance -->
+    <div class="card" style="padding:16px">
+      <div class="section-title" style="margin-bottom:10px">ℹ️ How it works</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:1.3rem;flex-shrink:0">📱</span>
+          <div>
+            <p style="font-size:.82rem;font-weight:800;color:var(--text)">Team scans QR &rarr; opens on their phone</p>
+            <p style="font-size:.75rem;color:var(--muted)">Hosted on Walmart servers. <strong>Your PC never needs to be on.</strong></p>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:1.3rem;flex-shrink:0">💾</span>
+          <div>
+            <p style="font-size:.82rem;font-weight:800;color:var(--text)">Observations save to their device</p>
+            <p style="font-size:.75rem;color:var(--muted)">Fully offline. localStorage never loses data between shifts.</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:1.3rem;flex-shrink:0">📡</span>
+          <div>
+            <p style="font-size:.82rem;font-weight:800;color:var(--text)">Alerts fire straight to Teams</p>
+            <p style="font-size:.75rem;color:var(--muted)">Phone → Teams. Direct. No server hop. No PC required.</p>
+          </div>
         </div>
       </div>
-      <p style="font-size:.7rem;color:var(--muted);font-weight:700;letter-spacing:.05em;
-               text-transform:uppercase">Scan to open on any device</p>
     </div>
 
-    <!-- URL copy row -->
+    <!-- Team Link (webhook baked in) -->
     <div class="card card-sm">
-      <div style="font-size:.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;
-                  letter-spacing:.08em;margin-bottom:6px">App URL</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">🔗 Team Link</div>
+        <span id="wh-status-badge"></span>
+      </div>
       <div style="display:flex;gap:8px;align-items:stretch">
         <div id="share-url-box"
              style="flex:1;background:#f1f5f9;border-radius:10px;padding:10px 12px;
-                    font-family:monospace;font-size:.78rem;font-weight:700;word-break:break-all;
+                    font-family:monospace;font-size:.72rem;font-weight:700;word-break:break-all;
                     color:var(--blue);cursor:text;user-select:all">
           https://puppy.walmart.com/sharing/d0l0ka3/atlas-fmo-audit-tool
         </div>
@@ -502,6 +516,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
           📋
         </button>
       </div>
+      <p id="wh-hint" style="font-size:.72rem;color:var(--muted);margin-top:6px"></p>
+    </div>
+
+    <!-- QR card -->
+    <div class="card" style="text-align:center;padding:20px 20px 14px">
+      <div id="qr-wrap" style="display:inline-block;padding:10px;border-radius:12px;border:3px solid var(--blue);margin-bottom:10px">
+        <img id="qr-img" alt="Team QR code" width="200" height="200"
+             style="display:block;border-radius:4px"
+             onerror="this.style.display='none';document.getElementById('qr-fallback').style.display='flex'">
+        <div id="qr-fallback" style="display:none;width:200px;height:200px;background:#f1f5f9;
+             border-radius:8px;align-items:center;justify-content:center;flex-direction:column">
+          <div style="font-size:2.5rem">📸</div>
+          <p style="font-size:.72rem;color:var(--muted);margin-top:6px">QR requires internet</p>
+        </div>
+      </div>
+      <p id="qr-label" style="font-size:.7rem;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase">Scan to open on any device</p>
     </div>
 
     <!-- Action buttons -->
@@ -510,39 +540,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         📤 Share via Teams / Messages / Email
       </button>
       <button id="install-btn" class="btn btn-green" style="display:none" onclick="installPWA()">
-        📥 Add to Home Screen
+        📥 Add to My Home Screen
       </button>
     </div>
 
     <!-- Install guide tabs -->
     <div class="card" style="padding:16px">
+      <p style="font-size:.78rem;font-weight:800;color:var(--text);margin-bottom:10px">📲 Team install guide</p>
       <div style="display:flex;gap:6px;margin-bottom:14px">
         <button class="install-tab active" onclick="switchTab('ios',this)">🍎 iOS / Safari</button>
         <button class="install-tab" onclick="switchTab('android',this)">🤖 Android / Chrome</button>
       </div>
       <div id="tab-ios">
-        <p style="font-size:.82rem;font-weight:700;margin-bottom:8px;color:var(--text)">Add to iPhone Home Screen:</p>
-        <ol style="font-size:.82rem;color:var(--muted);padding-left:1.2em;line-height:2">
-          <li>Open the link in <strong>Safari</strong></li>
-          <li>Tap the <strong>Share ⊟</strong> button at the bottom</li>
-          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-          <li>Tap <strong>Add</strong> — done! 🎉</li>
+        <ol style="font-size:.82rem;color:var(--muted);padding-left:1.2em;line-height:2.1">
+          <li>Open link in <strong>Safari</strong></li>
+          <li>Tap <strong>Share ⊟</strong> at the bottom</li>
+          <li>Tap <strong>“Add to Home Screen”</strong></li>
+          <li>Tap <strong>Add</strong> — icon appears! 🎉</li>
         </ol>
-        <p style="font-size:.72rem;color:var(--muted);margin-top:8px">
-          ℹ️ Must use Safari, not Chrome, on iOS.
-        </p>
+        <p style="font-size:.72rem;color:var(--muted);margin-top:8px">ℹ️ Must use Safari on iOS, not Chrome.</p>
       </div>
       <div id="tab-android" style="display:none">
-        <p style="font-size:.82rem;font-weight:700;margin-bottom:8px;color:var(--text)">Add to Android Home Screen:</p>
-        <ol style="font-size:.82rem;color:var(--muted);padding-left:1.2em;line-height:2">
-          <li>Open the link in <strong>Chrome</strong></li>
-          <li>Tap the <strong>⋮ menu</strong> (top right)</li>
-          <li>Tap <strong>"Add to Home Screen"</strong> or <strong>"Install App"</strong></li>
-          <li>Confirm — icon appears on your launcher 🎉</li>
+        <ol style="font-size:.82rem;color:var(--muted);padding-left:1.2em;line-height:2.1">
+          <li>Open link in <strong>Chrome</strong></li>
+          <li>Tap <strong>⋮ menu</strong> (top right)</li>
+          <li>Tap <strong>“Add to Home Screen”</strong> or <strong>“Install App”</strong></li>
+          <li>Confirm — launcher icon appears 🎉</li>
         </ol>
-        <p style="font-size:.72rem;color:var(--muted);margin-top:8px">
-          ℹ️ If you see an <strong>Install ☁️</strong> banner at the bottom of Chrome, just tap it!
-        </p>
+        <p style="font-size:.72rem;color:var(--muted);margin-top:8px">ℹ️ Chrome may auto-prompt at the bottom — just tap it!</p>
       </div>
     </div>
 
@@ -552,12 +577,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
       <span style="font-size:1.1rem;flex-shrink:0">📥</span>
       <div>
         <p style="font-size:.8rem;font-weight:800;color:var(--spark-d)">Works offline after first open</p>
-        <p style="font-size:.75rem;color:var(--muted);margin-top:2px">All observations save to your device.
-          Export JSON at end of shift to sync with your manager’s dashboard.</p>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:2px">Observations save locally. Export JSON at end of shift to sync to your manager’s dashboard.</p>
       </div>
     </div>
 
-    <button class="btn btn-ghost" style="margin-top:12px" onclick="goHome()">← Back to Dashboard</button>
+    <button class="btn btn-ghost" style="margin-top:12px" onclick="goHome()">← Back</button>
   </div>
 </div>
 
@@ -1109,6 +1133,12 @@ function _dl(content, filename, type){
 const APP_URL = 'https://puppy.walmart.com/sharing/d0l0ka3/atlas-fmo-audit-tool';
 let _deferredInstall = null;
 
+/** Return APP_URL with ?webhook=... baked in if one is saved. */
+function buildTeamURL(){
+  const wh = localStorage.getItem('fmo_webhook');
+  return wh ? `${APP_URL}?webhook=${encodeURIComponent(wh)}` : APP_URL;
+}
+
 // Inject PWA web manifest as a blob so the browser sees a real manifest
 // (controls home-screen icon, display mode, theme color)
 (function injectManifest(){
@@ -1161,29 +1191,33 @@ async function installPWA(){
 }
 
 async function nativeShare(){
+  const teamURL = buildTeamURL();
+  const hasWH   = !!localStorage.getItem('fmo_webhook');
   const data = {
     title: 'FMO Audit — NS FC',
-    text: 'Scan & log TIMWOOD waste observations on the floor. Works offline, no login needed.',
-    url: APP_URL,
+    text: hasWH
+      ? 'Log TIMWOOD waste — opens ready with Teams alerts. No setup needed.'
+      : 'Log TIMWOOD waste observations on the floor. Works offline, no login needed.',
+    url: teamURL,
   };
   if(navigator.share && navigator.canShare && navigator.canShare(data)){
     try{ await navigator.share(data); return; } catch(e){ /* user cancelled */ }
   }
-  // Fallback: copy to clipboard
   copyAppUrl();
-  alert('✅ Link copied! Paste it in Teams, Messages, or Email.');
+  alert('✅ Team link copied! Paste it in Teams, Messages, or Email.');
 }
 
 function copyAppUrl(btn){
-  navigator.clipboard.writeText(APP_URL).then(()=>{
-    const b = btn || document.querySelector('#share-url-box + button');
-    if(b){ const old=b.textContent; b.textContent='✅'; setTimeout(()=>b.textContent=old,2000); }
+  const teamURL = buildTeamURL();
+  navigator.clipboard.writeText(teamURL).then(()=>{
+    if(btn){ const old=btn.textContent; btn.textContent='✅'; setTimeout(()=>btn.textContent=old,2000); }
   }).catch(()=>{
     const box = document.getElementById('share-url-box');
     const r = document.createRange(); r.selectNodeContents(box);
     getSelection().removeAllRanges(); getSelection().addRange(r);
   });
 }
+
 
 function switchTab(which, btn){
   document.querySelectorAll('.install-tab').forEach(t=>t.classList.remove('active'));
@@ -1194,20 +1228,40 @@ function switchTab(which, btn){
 
 let _shareInited = false;
 function initShareScreen(){
-  const qr = document.getElementById('qr-img');
-  // Reload QR each visit so it always reflects latest URL
-  qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(APP_URL)}`;
+  const teamURL = buildTeamURL();
+  const hasWebhook = !!localStorage.getItem('fmo_webhook');
 
-  if(_shareInited) return; // attach listeners only once
+  // Update QR to encode the team URL (includes webhook if configured)
+  const qr = document.getElementById('qr-img');
+  qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(teamURL)}`;
+  qr.style.display = 'block';
+
+  // Update URL box
+  document.getElementById('share-url-box').textContent = teamURL;
+
+  // Webhook status badge
+  const badge = document.getElementById('wh-status-badge');
+  const hint  = document.getElementById('wh-hint');
+  const qrLbl = document.getElementById('qr-label');
+  if(hasWebhook){
+    badge.innerHTML = '<span style="background:#dcfce7;color:#166534;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:800">📡 Teams webhook embedded</span>';
+    hint.innerHTML  = '✅ Team opens this link → auto-connected to your Teams channel. <strong>Zero config for them.</strong>';
+    qrLbl.textContent = 'Scan → opens app → Teams alerts ready instantly';
+  } else {
+    badge.innerHTML = '<span style="background:#fef9c3;color:#854d0e;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:800">⚠️ No webhook yet</span>';
+    hint.innerHTML  = 'Add a Teams webhook in ⚙️ Settings → then come back to share. Team will auto-connect when you do.';
+    qrLbl.textContent = 'Scan to open on any device';
+  }
+
+  if(_shareInited) return;
   _shareInited = true;
 
-  const badge  = document.getElementById('offline-badge');
-  const update = () => badge.style.display = navigator.onLine ? 'none' : 'inline-flex';
+  const offBadge = document.getElementById('offline-badge');
+  const update = () => offBadge.style.display = navigator.onLine ? 'none' : 'inline-flex';
   update();
   window.addEventListener('online',  update);
   window.addEventListener('offline', update);
 
-  // Pre-select Android tab on Android devices
   if(/android/i.test(navigator.userAgent)){
     document.querySelectorAll('.install-tab')[1].click();
   }
@@ -1223,7 +1277,8 @@ function saveWebhook(){
   const url = document.getElementById('wh-url').value.trim();
   if(!url){alert('Please paste the webhook URL.'); return;}
   localStorage.setItem('fmo_webhook', url);
-  alert('✅ Webhook saved! Submissions will now post to Teams.');
+  _shareInited = false; // force share screen to refresh QR + status badge
+  alert('✅ Webhook saved! Go to Share to get your pre-configured team link.');
   goHome();
 }
 
@@ -1238,8 +1293,20 @@ function startObs(){
 (function init(){
   buildSiteSelect();
   buildPathSelects();
-  const wUrl = localStorage.getItem('fmo_webhook');
-  if(wUrl) document.getElementById('wh-url').value = wUrl;
+
+  // Auto-seed webhook from ?webhook= URL param so manager can share a pre-configured link
+  const params = new URLSearchParams(location.search);
+  const paramWH = params.get('webhook');
+  if(paramWH && paramWH.startsWith('https://')){
+    localStorage.setItem('fmo_webhook', paramWH);
+    document.getElementById('wh-url').value = paramWH;
+    // Remove param from address bar without reloading (don't expose in browser history)
+    history.replaceState(null, '', location.pathname);
+  } else {
+    const saved = localStorage.getItem('fmo_webhook');
+    if(saved) document.getElementById('wh-url').value = saved;
+  }
+
   loadIdentity();
 })();
 </script>
