@@ -48,11 +48,17 @@ def _lan_ip() -> str:
 
 
 def _make_qr_b64(url: str) -> str:
-    """Generate QR code PNG and return as base64 data URI."""
-    qr = qrcode.QRCode(box_size=6, border=2)
+    """Generate QR code PNG and return as base64 data URI.
+    Black on white = maximum camera compatibility.
+    """
+    qr = qrcode.QRCode(
+        box_size=10,   # bigger = easier to scan
+        border=4,      # standard quiet zone (4 modules)
+        error_correction=qrcode.constants.ERROR_CORRECT_H,  # 30% damage tolerance
+    )
     qr.add_data(url)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="#0053e2", back_color="white")
+    img = qr.make_image(fill_color="black", back_color="white")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
