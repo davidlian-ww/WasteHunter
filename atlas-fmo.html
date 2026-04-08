@@ -139,16 +139,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
           <option value="PM">🌇 PM Shift</option>
           <option value="Night">🌙 Night Shift</option>
         </select></div>
-      <div class="field"><label>Department / Area *</label>
-        <select id="id-dept">
-          <option value="">— Select your area —</option>
-          <option>Inbound / Receiving</option><option>Stow</option>
-          <option>Pick</option><option>Pack</option>
-          <option>Ship / Outbound</option><option>Returns</option>
-          <option>Quality</option><option>Maintenance</option>
-          <option>Inventory Control</option><option>Leadership / Admin</option>
-          <option>Other</option>
-        </select></div>
+      <div class="field"><label>Process Path / Area *</label>
+        <select id="id-dept"><option value="">— Select your process path —</option></select>
+      </div>
     </div>
     <button class="btn btn-primary" onclick="saveIdentity()">✅ Save &amp; Start →</button>
     <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="show('s-webhook-setup')">
@@ -171,6 +164,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <button class="btn btn-primary" style="font-size:1.1rem;padding:20px" onclick="startObs()">
       ➕ Log New Observation
     </button>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-secondary btn-sm" onclick="goDataBank()">🗄️ Data Bank</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('s-webhook-setup')">&#9881;&#xFE0F; Settings</button>
+    </div>
     <div style="margin-top:20px">
       <div class="section-title" id="session-count-label">This Session</div>
       <div id="session-list"><p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">
@@ -216,6 +213,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <div class="card">
       <div class="field"><label>Title / Brief Description *</label>
         <input id="det-title" type="text" placeholder="e.g. Pallets blocking pick aisle"></div>
+      <div class="field"><label>Process Path (where did you see it?)</label>
+        <select id="det-path"><option value="">— Same as my area —</option></select>
+      </div>
       <div class="field"><label>Details (optional)</label>
         <textarea id="det-desc" placeholder="What did you see? Impact? How often? Any ideas?"></textarea></div>
     </div>
@@ -273,6 +273,82 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
 </div>
 
+<!-- ── DATA BANK ── -->
+<div id="s-databank" class="screen">
+  <div class="hdr">
+    <div class="hdr-top">
+      <span class="hdr-brand">IND2 FMO</span>
+      <span class="hdr-badge" id="db-count-badge">0 records</span>
+    </div>
+    <h1>🗄️ Data Bank</h1>
+    <p>All observations logged on this device</p>
+  </div>
+  <div class="content" style="padding-bottom:80px">
+    <!-- search + filter bar -->
+    <div class="card card-sm" style="margin-bottom:12px">
+      <input id="db-search" type="search" placeholder="🔍 Search title, area, category…"
+        style="width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:10px;
+               font-size:.9rem;font-family:inherit;outline:none"
+        oninput="renderBank()">
+      <div class="row" style="margin-top:8px;gap:6px">
+        <select id="db-filter-cat" onchange="renderBank()"
+          style="flex:1;padding:8px;border:2px solid #e2e8f0;border-radius:10px;
+                 font-size:.78rem;font-family:inherit;outline:none">
+          <option value="">All Categories</option>
+          <option>Transportation</option><option>Inventory</option>
+          <option>Motion</option><option>Waiting</option>
+          <option>Overproduction</option><option>Over-processing</option>
+          <option>Defects</option>
+        </select>
+        <select id="db-filter-sev" onchange="renderBank()"
+          style="flex:1;padding:8px;border:2px solid #e2e8f0;border-radius:10px;
+                 font-size:.78rem;font-family:inherit;outline:none">
+          <option value="">All Severity</option>
+          <option>Low</option><option>Medium</option>
+          <option>High</option><option>Critical</option>
+        </select>
+      </div>
+    </div>
+    <!-- summary chips -->
+    <div id="db-chips" class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <!-- list -->
+    <div id="db-list"></div>
+    <!-- empty state -->
+    <div id="db-empty" style="display:none;text-align:center;padding:40px 0;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:8px">📦</div>
+      <p style="font-size:.9rem;font-weight:700">No records found</p>
+      <p style="font-size:.8rem;margin-top:4px">Try adjusting your filters</p>
+    </div>
+  </div>
+  <!-- sticky bottom bar -->
+  <div style="position:fixed;bottom:0;left:0;right:0;background:var(--white);
+              border-top:1px solid #e2e8f0;padding:12px 20px;
+              display:flex;gap:10px;max-width:500px;margin:0 auto">
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportBank()">📤 Export All</button>
+    <button class="btn btn-ghost btn-sm" style="color:var(--red);flex:1" onclick="clearBank()">🗑️ Clear All</button>
+    <button class="btn btn-ghost btn-sm" style="flex:1" onclick="goHome()">&#8592; Home</button>
+  </div>
+</div>
+
+<!-- ── DETAIL MODAL ── -->
+<div id="modal-overlay" onclick="closeModal()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100">
+  <div id="modal-box" onclick="event.stopPropagation()"
+       style="position:absolute;bottom:0;left:0;right:0;max-width:500px;margin:0 auto;
+              background:var(--white);border-radius:20px 20px 0 0;
+              padding:24px 20px 40px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span id="modal-cat-label" style="font-size:1.1rem;font-weight:900"></span>
+      <button onclick="closeModal()"
+        style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--muted)">&times;</button>
+    </div>
+    <div id="modal-body"></div>
+    <button id="modal-delete-btn" class="btn btn-red btn-sm" style="margin-top:20px">
+      🗑️ Delete This Record
+    </button>
+  </div>
+</div>
+
 <!-- ── WEBHOOK SETUP ── -->
 <div id="s-webhook-setup" class="screen">
   <div class="hdr">
@@ -316,9 +392,45 @@ const SEVS = [
   {k:'Critical', icon:'🔴', color:'#ea1100', bg:'#fef2f2', desc:'Stop-work — immediate action'},
 ];
 
-// ── State ─────────────────────────────────────────────────────────
+// Non-sort FC process paths — single source of truth
+const PROCESS_PATHS = [
+  {g:'🟦 Inbound', paths:[
+    'Unload / Trailer Drop','Receive / Check-In','Inbound Problem Solve (IPS)',
+    'Stow / Putaway','Inbound Audit']},
+  {g:'🟨 Outbound – Pick', paths:[
+    'Pick – Full Case','Pick – Each / Broken Case','Pick – Oversize / Non-Conveyable',
+    'Pick Exception / Short Pick','Consolidate / Stage']},
+  {g:'🟧 Outbound – Pack', paths:[
+    'Pack – Standard','Pack – Oversize / Non-Conveyable',
+    'Pack – Gift / Special Services','Re-pack / Re-label']},
+  {g:'🟥 Outbound – Ship', paths:[
+    'Manifest / Weight & Scan','Sort & Stage to Trailers',
+    'Load / Ship','Carrier Management / Dock','Yard Management']},
+  {g:'🟪 Returns', paths:[
+    'Returns Receive (RTV / RTF)','Returns Assess / Grade',
+    'Returns Stow','Returns Dispose / Liquidate']},
+  {g:'🟫 Inventory Control', paths:[
+    'Cycle Count','Research & Reconcile','Location Audit','Lost & Found']},
+  {g:'⬜ Quality & Safety', paths:[
+    'Inbound Quality Check','Outbound Quality Check','Defect Investigation',
+    'SOP Compliance Audit','Safety Observation']},
+  {g:'⚙️ Support / Enabling', paths:[
+    'Maintenance / Engineering','Facilities / Housekeeping','IT / Systems',
+    'Loss Prevention (LP)','HR / People / Training','Leadership / Admin','Other']},
+];
+
+function buildPathSelects(){
+  const html = PROCESS_PATHS.map(g=>
+    `<optgroup label="${g.g}">${g.paths.map(p=>`<option>${p}</option>`).join('')}</optgroup>`
+  ).join('');
+  document.getElementById('id-dept').innerHTML +=  html;
+  document.getElementById('det-path').innerHTML += html;
+}
+
+// ── State ─────────────────────────────────────────────────────
 let obs = {};
-let session = JSON.parse(localStorage.getItem('fmo_session')||'[]');
+let session  = JSON.parse(localStorage.getItem('fmo_session')||'[]');
+let databank = JSON.parse(localStorage.getItem('fmo_databank')||'[]');
 
 // ── Navigation ────────────────────────────────────────────────────
 function show(id){
@@ -380,6 +492,7 @@ function goToSeverity(){
   if(!title){alert('Please enter a brief title.'); return;}
   obs.title = title;
   obs.description = document.getElementById('det-desc').value.trim();
+  obs.path_override = document.getElementById('det-path').value; // '' means use home area
   buildSevList();
   show('s-severity');
 }
@@ -408,9 +521,12 @@ function selectSev(k){
 
 // ── Review ────────────────────────────────────────────────────────
 function buildReview(){
-  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
-  const cat = CATS.find(c=>c.k===obs.category)||{};
-  const sev = SEVS.find(s=>s.k===obs.severity)||{};
+  const id   = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const cat  = CATS.find(c=>c.k===obs.category)||{};
+  const sev  = SEVS.find(s=>s.k===obs.severity)||{};
+  const effectivePath = obs.path_override || id.dept || 'General';
+  const pathNote = obs.path_override && obs.path_override !== id.dept
+    ? ` <span style="font-size:.7rem;color:var(--muted)">(your area: ${id.dept})</span>` : '';
   document.getElementById('review-card').innerHTML = `
     <div class="kv"><span class="kv-key">Category</span>
       <span class="kv-val">${cat.icon||''} ${obs.category}</span></div>
@@ -420,10 +536,12 @@ function buildReview(){
       <span class="kv-val">${obs.title}</span></div>
     ${obs.description?`<div class="kv"><span class="kv-key">Details</span>
       <span class="kv-val" style="font-weight:400;font-size:.82rem">${obs.description}</span></div>`:''}
+    <div class="kv"><span class="kv-key">Observed At</span>
+      <span class="kv-val">${effectivePath}${pathNote}</span></div>
     <div class="kv"><span class="kv-key">Observer</span>
       <span class="kv-val">${id.name||'—'}</span></div>
-    <div class="kv"><span class="kv-key">Shift · Area</span>
-      <span class="kv-val">${(id.shift||'')+'  ·  '+(id.dept||'')}</span></div>`;
+    <div class="kv"><span class="kv-key">Shift</span>
+      <span class="kv-val">${id.shift||'—'}</span></div>`;
 }
 
 // ── Submit ────────────────────────────────────────────────────────
@@ -432,11 +550,13 @@ async function submitObs(){
   btn.disabled = true; btn.textContent = '⏳ Submitting…';
 
   const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const effectivePath = obs.path_override || id.dept || 'General';
   const entry = {
     id: Date.now(),
     observer: id.name||'Anonymous',
     shift: id.shift||'—',
-    process_path: id.dept||'General',
+    process_path: effectivePath,
+    observer_area: id.dept||'General',
     waste_category: obs.category,
     title: obs.title,
     description: obs.description||'',
@@ -447,6 +567,8 @@ async function submitObs(){
   // Save locally first (always)
   session.push(entry);
   localStorage.setItem('fmo_session', JSON.stringify(session));
+  databank.push(entry);
+  localStorage.setItem('fmo_databank', JSON.stringify(databank));
 
   // Attempt Teams webhook
   const wUrl = localStorage.getItem('fmo_webhook');
@@ -455,8 +577,9 @@ async function submitObs(){
 
   obs = {};
   document.getElementById('det-title').value = '';
-  document.getElementById('det-desc').value = '';
-  btn.disabled = false; btn.textContent = '✅ Submit Observation';
+  document.getElementById('det-desc').value  = '';
+  document.getElementById('det-path').value  = '';
+  btn.disabled = false; btn.textContent = '\u2705 Submit Observation';
 
   const msg = teamsOk
     ? '✅ Sent to Teams Quality Channel. Your manager will see it immediately.'
@@ -536,11 +659,148 @@ function exportJSON(){
     shift: id.shift||'—',
     observations: session
   };
-  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  _dl(JSON.stringify(data,null,2),
+      `fmo_${(id.name||'export').replace(/ /g,'_')}_${new Date().toISOString().slice(0,10)}.json`,
+      'application/json');
+}
+
+// ── Data Bank ────────────────────────────────────────────────
+function goDataBank(){
+  renderBank();
+  show('s-databank');
+}
+
+function filteredBank(){
+  const q   = (document.getElementById('db-search').value||'').toLowerCase();
+  const cat = document.getElementById('db-filter-cat').value;
+  const sev = document.getElementById('db-filter-sev').value;
+  return [...databank].reverse().filter(e=>{
+    if(cat && e.waste_category !== cat) return false;
+    if(sev && e.severity !== sev) return false;
+    if(q && ![
+      e.title, e.waste_category, e.process_path,
+      e.observer, e.description
+    ].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function renderBank(){
+  const records = filteredBank();
+  document.getElementById('db-count-badge').textContent =
+    databank.length + (databank.length===1?' record':' records');
+
+  // Summary chips
+  const chips = document.getElementById('db-chips');
+  const catCounts = {};
+  databank.forEach(e=>{ catCounts[e.waste_category]=(catCounts[e.waste_category]||0)+1; });
+  chips.innerHTML = Object.entries(catCounts)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>{
+      const cat = CATS.find(c=>c.k===k)||{icon:'',color:'#666'};
+      return `<span style="background:#f1f5f9;color:${cat.color};font-size:.7rem;
+        font-weight:800;padding:4px 10px;border-radius:20px;border:1.5px solid ${cat.color}">
+        ${cat.icon} ${k}: ${v}</span>`;
+    }).join('');
+
+  const el = document.getElementById('db-list');
+  const empty = document.getElementById('db-empty');
+  if(!records.length){
+    el.innerHTML = ''; empty.style.display='block'; return;
+  }
+  empty.style.display='none';
+
+  el.innerHTML = records.map((e,i)=>{
+    const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️'};
+    const sev = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
+    const dt  = new Date(e.timestamp);
+    const dateStr = dt.toLocaleDateString([],{month:'short',day:'numeric'});
+    const timeStr = dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div class="obs-row" onclick="openDetail(${e.id})" style="cursor:pointer">
+      <div class="obs-dot" style="background:${sev.color}"></div>
+      <div class="obs-info">
+        <div class="obs-title">${e.title}</div>
+        <div class="obs-meta">${cat.icon} ${e.waste_category} &middot; ${e.process_path}</div>
+        <div class="obs-meta" style="margin-top:1px">${e.observer} &middot; ${dateStr} ${timeStr}</div>
+      </div>
+      <span style="font-size:.7rem;font-weight:800;color:${sev.color};white:nowrap">${e.severity}</span>
+    </div>`;
+  }).join('');
+}
+
+let _modalId = null;
+function openDetail(id){
+  const e   = databank.find(x=>x.id===id); if(!e) return;
+  const cat = CATS.find(c=>c.k===e.waste_category)||{icon:'🗑️',color:'#333'};
+  const sev = SEVS.find(s=>s.k===e.severity)||{color:'#333',icon:''};
+  _modalId  = id;
+  document.getElementById('modal-cat-label').innerHTML =
+    `<span style="color:${cat.color}">${cat.icon} ${e.waste_category}</span>`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="kv"><span class="kv-key">Title</span>
+      <span class="kv-val">${e.title}</span></div>
+    ${e.description?`<div class="kv"><span class="kv-key">Details</span>
+      <span class="kv-val" style="font-weight:400;font-size:.82rem">${e.description}</span></div>`:''}
+    <div class="kv"><span class="kv-key">Severity</span>
+      <span class="kv-val" style="color:${sev.color}">${sev.icon} ${e.severity}</span></div>
+    <div class="kv"><span class="kv-key">Process Path</span>
+      <span class="kv-val">${e.process_path}</span></div>
+    <div class="kv"><span class="kv-key">Observer</span>
+      <span class="kv-val">${e.observer}</span></div>
+    <div class="kv"><span class="kv-key">Shift</span>
+      <span class="kv-val">${e.shift}</span></div>
+    <div class="kv"><span class="kv-key">Logged</span>
+      <span class="kv-val">${new Date(e.timestamp).toLocaleString()}</span></div>
+    <div class="kv"><span class="kv-key">Record ID</span>
+      <span class="kv-val" style="font-family:monospace;font-size:.75rem">${e.id}</span></div>`;
+  document.getElementById('modal-delete-btn').onclick = () => deleteRecord(id);
+  document.getElementById('modal-overlay').style.display='block';
+  document.body.style.overflow='hidden';
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').style.display='none';
+  document.body.style.overflow='';
+}
+
+function deleteRecord(id){
+  if(!confirm('Delete this observation? This cannot be undone.')) return;
+  databank = databank.filter(e=>e.id!==id);
+  localStorage.setItem('fmo_databank', JSON.stringify(databank));
+  // Also remove from session if present
+  session = session.filter(e=>e.id!==id);
+  localStorage.setItem('fmo_session', JSON.stringify(session));
+  closeModal();
+  renderBank();
+}
+
+function exportBank(){
+  const records = filteredBank();
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  // Build CSV
+  const cols = ['id','timestamp','observer','shift','process_path',
+                 'waste_category','severity','title','description'];
+  const esc = v => '"'+String(v||'').replace(/"/g,'""')+'"';
+  const csv = [cols.join(','),
+    ...records.map(e=>cols.map(c=>esc(e[c])).join(','))
+  ].join('\n');
+  _dl(csv, `fmo_databank_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+}
+
+function clearBank(){
+  if(!confirm(`Permanently delete ALL ${databank.length} records from the data bank?\n\nThis cannot be undone.`)) return;
+  databank = []; session = [];
+  localStorage.removeItem('fmo_databank');
+  localStorage.removeItem('fmo_session');
+  renderBank(); renderSession();
+}
+
+function _dl(content, filename, type){
+  const blob = new Blob([content],{type});
   const url  = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href=url; a.download=`fmo_${id.name||'export'}_${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); URL.revokeObjectURL(url);
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Webhook ───────────────────────────────────────────────────────
@@ -561,6 +821,7 @@ function startObs(){
 
 // ── Init ──────────────────────────────────────────────────────────
 (function init(){
+  buildPathSelects();
   const wUrl = localStorage.getItem('fmo_webhook');
   if(wUrl) document.getElementById('wh-url').value = wUrl;
   loadIdentity();
