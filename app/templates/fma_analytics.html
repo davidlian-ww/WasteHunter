@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIMWOOD FMA Analysis</title>
+    <link rel="stylesheet" href="/static/tailwind.min.css">
+    <script src="/static/chart.min.js"></script>
+    <style>
+        .chart-container { position: relative; height: 350px; margin: 1rem 0; }
+        .severity-low { @apply bg-green-100 text-green-800; }
+        .severity-medium { @apply bg-yellow-100 text-yellow-800; }
+        .severity-high { @apply bg-orange-100 text-orange-800; }
+        .severity-critical { @apply bg-red-100 text-red-800; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <a href="/" class="text-2xl">🏠</a>
+                <div>
+                    <div class="text-xl font-bold text-gray-900">Failure Mode Analysis</div>
+                    <div class="text-xs text-gray-500">Complete FMEA Breakdown</div>
+                </div>
+            </div>
+            <a href="/" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">← Back</a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Executive Summary Section -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6">📊 Executive Summary</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-blue-500 bg-opacity-30 rounded-lg p-4">
+                    <div class="text-sm font-medium opacity-90">Total Failures</div>
+                    <div class="text-3xl font-bold mt-2">{{ fma_data.total_impact.total_failures or 0 }}</div>
+                </div>
+                <div class="bg-blue-500 bg-opacity-30 rounded-lg p-4">
+                    <div class="text-sm font-medium opacity-90">Total Cost Impact</div>
+                    <div class="text-3xl font-bold mt-2">${{ "%.0f"|format(fma_data.total_impact.total_cost or 0) }}</div>
+                </div>
+                <div class="bg-blue-500 bg-opacity-30 rounded-lg p-4">
+                    <div class="text-sm font-medium opacity-90">Hours Lost</div>
+                    <div class="text-3xl font-bold mt-2">{{ "%.1f"|format(fma_data.total_impact.total_hours or 0) }}</div>
+                </div>
+                <div class="bg-blue-500 bg-opacity-30 rounded-lg p-4">
+                    <div class="text-sm font-medium opacity-90">Most Common</div>
+                    {% if fma_data.by_category %}
+                    <div class="text-lg font-bold mt-2">{{ fma_data.by_category[0].waste_category }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Failures by Category -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Failures by TIMWOOD Category</h3>
+                <div class="chart-container">
+                    <canvas id="byCategory"></canvas>
+                </div>
+            </div>
+
+            <!-- Severity Distribution -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Severity Breakdown</h3>
+                <div class="chart-container">
+                    <canvas id="severityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Mitigation Status -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Mitigation Progress</h3>
+                <div class="chart-container">
+                    <canvas id="mitigationChart"></canvas>
+                </div>
+            </div>
+
+            <!-- RPN by Category -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Average RPN Score by Category</h3>
+                <div class="chart-container">
+                    <canvas id="rpnChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">📈 Category Deep Dive</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {% for cat in fma_data.by_category %}
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-semibold text-gray-900">{{ cat.waste_category }}</h4>
+                        <span class="text-lg font-bold text-blue-600">{{ cat.count }}</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-2">
+                        Avg RPN: <span class="font-bold">{{ "%0.1f"|format(cat.avg_rpn or 0) }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-600 h-2 rounded-full" style="width: {{ (cat.count / fma_data.total_impact.total_failures * 100) if fma_data.total_impact.total_failures else 0 }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Top 10 Failure Modes -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">🔴 Top Failure Modes (by RPN)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Rank</th>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Failure Mode</th>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Category</th>
+                            <th class="px-4 py-3 text-center font-bold text-gray-900">RPN</th>
+                            <th class="px-4 py-3 text-center font-bold text-gray-900">Severity</th>
+                            <th class="px-4 py-3 text-center font-bold text-gray-900">O×D</th>
+                            <th class="px-4 py-3 text-right font-bold text-gray-900">Cost Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fm in fma_data.top_by_rpn %}
+                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+                            <td class="px-4 py-3">
+                                <span class="inline-block bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold w-8 text-center">{{ loop.index }}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="font-semibold text-gray-900">{{ fm.title }}</div>
+                                {% if fm.root_cause %}<div class="text-xs text-gray-500 mt-1">Cause: {{ fm.root_cause[:40] }}...</div>{% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs font-medium">{{ fm.waste_category }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-block bg-red-600 text-white px-3 py-1 rounded font-bold text-sm">{{ fm.rpn_score or '—' }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-1 rounded text-xs font-semibold
+                                    {% if fm.severity == 'Critical' %} severity-critical
+                                    {% elif fm.severity == 'High' %} severity-high
+                                    {% elif fm.severity == 'Medium' %} severity-medium
+                                    {% else %} severity-low
+                                    {% endif %}">{{ fm.severity }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-center font-semibold text-gray-900">
+                                {{ fm.occurrence_score or 0 }} × {{ fm.detection_score or 0 }}
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="font-bold text-gray-900">${{ "%.0f"|format(fm.impact_cost or 0) }}</span>
+                                {% if fm.impact_hours %}<div class="text-xs text-gray-500">{{ fm.impact_hours }} hrs</div>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Mitigation Status Details -->
+        {% if fma_data.mitigation_status %}
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">⚙️ Mitigation Status Overview</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {% for status in fma_data.mitigation_status %}
+                <div class="border-2 rounded-lg p-4
+                    {% if status.mitigation_status == 'Completed' %} border-green-400 bg-green-50
+                    {% elif status.mitigation_status == 'In Progress' %} border-yellow-400 bg-yellow-50
+                    {% elif status.mitigation_status == 'On Hold' %} border-orange-400 bg-orange-50
+                    {% else %} border-red-400 bg-red-50
+                    {% endif %}">
+                    <div class="text-sm font-medium text-gray-900">{{ status.mitigation_status }}</div>
+                    <div class="text-2xl font-bold mt-2
+                        {% if status.mitigation_status == 'Completed' %} text-green-600
+                        {% elif status.mitigation_status == 'In Progress' %} text-yellow-600
+                        {% elif status.mitigation_status == 'On Hold' %} text-orange-600
+                        {% else %} text-red-600
+                        {% endif %}">{{ status.count }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Key Insights -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-orange-400 rounded-lg p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">💡 Key Insights & Recommendations</h3>
+            <ul class="space-y-3 text-sm text-gray-700">
+                {% if fma_data.by_category %}
+                    <li class="flex items-start gap-3">
+                        <span class="text-orange-600 font-bold text-lg">1</span>
+                        <span><strong>Most Impacted Category:</strong> {{ fma_data.by_category[0].waste_category }} with {{ fma_data.by_category[0].count }} failures. Focus initial mitigation efforts here.</span>
+                    </li>
+                {% endif %}
+                {% if fma_data.top_by_rpn and fma_data.top_by_rpn[0] %}
+                    <li class="flex items-start gap-3">
+                        <span class="text-orange-600 font-bold text-lg">2</span>
+                        <span><strong>Highest RPN Failure:</strong> {{ fma_data.top_by_rpn[0].title }} (RPN {{ fma_data.top_by_rpn[0].rpn_score }}). Prioritize root cause analysis.</span>
+                    </li>
+                {% endif %}
+                <li class="flex items-start gap-3">
+                    <span class="text-orange-600 font-bold text-lg">3</span>
+                    <span><strong>Financial Impact:</strong> Total identified impact of ${{ "%.0f"|format(fma_data.total_impact.total_cost or 0) }} across {{ fma_data.total_impact.total_failures or 0 }} failure modes.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-orange-600 font-bold text-lg">4</span>
+                    <span><strong>Action Items:</strong> Develop mitigation strategies targeting high-RPN failures first using the Pareto principle (80/20 rule).</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const byCategory = {{ by_category_json|safe }};
+        const severityDist = {{ severity_dist_json|safe }};
+        const mitigationStatus = {{ mitigation_status_json|safe }};
+        const topByRpn = {{ top_by_rpn_json|safe }};
+
+        const COLORS = ['#0053e2', '#ffc220', '#ea1100', '#2a8703', '#ff6b6b', '#4ecdc4', '#45b7d1'];
+
+        // By Category
+        new Chart(document.getElementById('byCategory'), {
+            type: 'bar',
+            data: {
+                labels: byCategory.map(d => d.waste_category),
+                datasets: [{
+                    label: 'Number of Failures',
+                    data: byCategory.map(d => d.count),
+                    backgroundColor: COLORS,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        // Severity
+        new Chart(document.getElementById('severityChart'), {
+            type: 'doughnut',
+            data: {
+                labels: severityDist.map(d => d.severity),
+                datasets: [{
+                    data: severityDist.map(d => d.count),
+                    backgroundColor: ['#2a8703', '#ffc220', '#ff9800', '#ea1100'],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // Mitigation Status
+        new Chart(document.getElementById('mitigationChart'), {
+            type: 'doughnut',
+            data: {
+                labels: mitigationStatus.map(d => d.mitigation_status),
+                datasets: [{
+                    data: mitigationStatus.map(d => d.count),
+                    backgroundColor: ['#2a8703', '#ffc220', '#ff9800', '#ea1100'],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // RPN by Category
+        new Chart(document.getElementById('rpnChart'), {
+            type: 'bar',
+            data: {
+                labels: byCategory.map(d => d.waste_category),
+                datasets: [{
+                    label: 'Average RPN Score',
+                    data: byCategory.map(d => d.avg_rpn || 0),
+                    backgroundColor: '#0053e2',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!-- Failure Mode Analysis Card - For detail view and updates -->
+<div class="bg-white rounded-lg shadow p-6 border-t-4 border-red-500" id="failure-mode-{{ obs_id }}">
+    <div class="flex justify-between items-start mb-4">
+        <h3 class="text-lg font-bold text-gray-900">🔧 Failure Mode Analysis</h3>
+        <span class="text-sm text-gray-500">RPN: {{ rpn or 'Pending' }}</span>
+    </div>
+
+    {% if failure_mode %}
+    <form hx-post="/fma/{{ obs_id }}/update"
+          hx-target="#failure-mode-{{ obs_id }}"
+          hx-swap="outerHTML"
+          class="space-y-4">
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Occurrence Score -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">
+                    Occurrence (1-10)
+                    <span class="text-gray-500 text-xs">How often does this occur?</span>
+                </label>
+                <input type="number" name="occurrence_score" min="1" max="10"
+                       value="{{ failure_mode.occurrence_score or 3 }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                       required>
+            </div>
+
+            <!-- Detection Score -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">
+                    Detection (1-10)
+                    <span class="text-gray-500 text-xs">How easily is it detected?</span>
+                </label>
+                <input type="number" name="detection_score" min="1" max="10"
+                       value="{{ failure_mode.detection_score or 3 }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                       required>
+            </div>
+
+            <!-- Root Cause -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Root Cause</label>
+                <input type="text" name="root_cause"
+                       value="{{ failure_mode.root_cause or '' }}"
+                       placeholder="What causes this failure?"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Impact Hours -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Impact Hours</label>
+                <input type="number" name="impact_hours" step="0.1" min="0"
+                       value="{{ failure_mode.impact_hours or 0 }}"
+                       placeholder="Hours lost per occurrence"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+
+            <!-- Impact Cost -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Impact Cost ($)</label>
+                <input type="number" name="impact_cost" step="0.01" min="0"
+                       value="{{ failure_mode.impact_cost or 0 }}"
+                       placeholder="Financial impact"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-900 mb-2">Mitigation Action</label>
+            <textarea name="mitigation_action"
+                      placeholder="What will be done to prevent this failure?"
+                      class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      rows="3">{{ failure_mode.mitigation_action or '' }}</textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Owner</label>
+                <input type="text" name="mitigation_owner"
+                       value="{{ failure_mode.mitigation_owner or '' }}"
+                       placeholder="Responsible person"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Due Date</label>
+                <input type="date" name="mitigation_due_date"
+                       value="{{ failure_mode.mitigation_due_date or '' }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-900 mb-2">Status</label>
+                <select name="mitigation_status"
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+                    <option {% if not failure_mode.mitigation_status or failure_mode.mitigation_status == 'Not Started' %}selected{% endif %}>Not Started</option>
+                    <option {% if failure_mode.mitigation_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                    <option {% if failure_mode.mitigation_status == 'Completed' %}selected{% endif %}>Completed</option>
+                    <option {% if failure_mode.mitigation_status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium">
+                💾 Save FMA Analysis
+            </button>
+            <button type="reset" class="px-4 py-2 bg-gray-100 text-gray-800 rounded hover:bg-gray-200">Reset</button>
+        </div>
+    </form>
+
+    <div class="mt-6 pt-6 border-t border-gray-200">
+        <h4 class="font-semibold text-gray-900 mb-3">📊 Quick Stats</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-blue-50 rounded p-3">
+                <div class="text-xs text-gray-600">RPN Score</div>
+                <div class="text-2xl font-bold text-blue-600">{{ rpn or '—' }}</div>
+            </div>
+            <div class="bg-orange-50 rounded p-3">
+                <div class="text-xs text-gray-600">Hours Impact</div>
+                <div class="text-2xl font-bold text-orange-600">{{ failure_mode.impact_hours or 0 }}</div>
+            </div>
+            <div class="bg-red-50 rounded p-3">
+                <div class="text-xs text-gray-600">Cost Impact</div>
+                <div class="text-2xl font-bold text-red-600">${{ "%.2f"|format(failure_mode.impact_cost or 0) }}</div>
+            </div>
+            <div class="bg-green-50 rounded p-3">
+                <div class="text-xs text-gray-600">Status</div>
+                <div class="text-lg font-bold text-green-600">{{ failure_mode.mitigation_status or 'Pending' }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded p-4">
+        <p class="text-sm text-yellow-800">No FMA analysis yet. Create one above.</p>
+    </div>
+    {% endif %}
+</div>

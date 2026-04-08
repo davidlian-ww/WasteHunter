@@ -4,30 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TIMWOOD Waste Dashboard{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'walmart-blue': '#0053e2',
-                        'walmart-blue-hover': '#0046c7',
-                        'walmart-blue-pressed': '#0033a0',
-                        'walmart-spark': '#ffc220',
-                        'walmart-spark-hover': '#e6af1d',
-                        'walmart-red': '#ea1100',
-                        'walmart-green': '#2a8703',
-                        'walmart-warning': '#995213',
-                        'walmart-warning-bg': '#fff8e6',
-                        'walmart-gray': '#74767b',
-                        'walmart-gray-light': '#f5f5f5',
-                        'walmart-gray-border': '#d9d9d9',
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="/static/tailwind.min.css">
+    <script src="/static/htmx.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -57,7 +35,7 @@
         .status-open { background: #ea1100; color: white; }
         .status-in-progress { background: #ffc220; color: #995213; }
         .status-resolved { background: #2a8703; color: white; }
-        .s { background: #74767b; color: white; }
+        .status-closed { background: #74767b; color: white; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
