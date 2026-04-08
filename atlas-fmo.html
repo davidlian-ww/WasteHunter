@@ -124,7 +124,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <!-- ── IDENTITY SETUP ── -->
 <div id="s-identity" class="screen active">
   <div class="hdr">
-    <div class="hdr-top"><span class="hdr-brand">Walmart · IND2</span></div>
+    <div class="hdr-top"><span class="hdr-brand">Walmart · NS FMO</span></div>
     <h1>FMO Audit Tool</h1>
     <p>Set up your profile — one time only</p>
   </div>
@@ -133,13 +133,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
       <div class="section-title">👤 Your Info</div>
       <div class="field"><label>Your Name *</label>
         <input id="id-name" type="text" placeholder="First Last" autocomplete="name"></div>
+      <div class="field"><label>NS Site *</label>
+        <select id="id-site"><option value="">— Select your FC —</option></select></div>
       <div class="field"><label>Shift</label>
         <select id="id-shift">
           <option value="AM">🌅 AM Shift</option>
           <option value="PM">🌇 PM Shift</option>
           <option value="Night">🌙 Night Shift</option>
         </select></div>
-      <div class="field"><label>Process Path / Area *</label>
+      <div class="field"><label>Your Process Path / Area *</label>
         <select id="id-dept"><option value="">— Select your process path —</option></select>
       </div>
     </div>
@@ -154,7 +156,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <div id="s-home" class="screen">
   <div class="hdr">
     <div class="hdr-top">
-      <span class="hdr-brand">Walmart · IND2 FMO</span>
+      <span class="hdr-brand" id="home-site-label">Walmart · NS FMO</span>
       <span class="hdr-badge" id="home-user" onclick="show('s-identity')">👤 —</span>
     </div>
     <h1>Audit Dashboard</h1>
@@ -392,38 +394,93 @@ const SEVS = [
   {k:'Critical', icon:'🔴', color:'#ea1100', bg:'#fef2f2', desc:'Stop-work — immediate action'},
 ];
 
-// Non-sort FC process paths — single source of truth
-const PROCESS_PATHS = [
-  {g:'🟦 Inbound', paths:[
-    'Unload / Trailer Drop','Receive / Check-In','Inbound Problem Solve (IPS)',
-    'Stow / Putaway','Inbound Audit']},
-  {g:'🟨 Outbound – Pick', paths:[
-    'Pick – Full Case','Pick – Each / Broken Case','Pick – Oversize / Non-Conveyable',
-    'Pick Exception / Short Pick','Consolidate / Stage']},
-  {g:'🟧 Outbound – Pack', paths:[
-    'Pack – Standard','Pack – Oversize / Non-Conveyable',
-    'Pack – Gift / Special Services','Re-pack / Re-label']},
-  {g:'🟥 Outbound – Ship', paths:[
-    'Manifest / Weight & Scan','Sort & Stage to Trailers',
-    'Load / Ship','Carrier Management / Dock','Yard Management']},
-  {g:'🟪 Returns', paths:[
-    'Returns Receive (RTV / RTF)','Returns Assess / Grade',
-    'Returns Stow','Returns Dispose / Liquidate']},
-  {g:'🟫 Inventory Control', paths:[
-    'Cycle Count','Research & Reconcile','Location Audit','Lost & Found']},
-  {g:'⬜ Quality & Safety', paths:[
-    'Inbound Quality Check','Outbound Quality Check','Defect Investigation',
-    'SOP Compliance Audit','Safety Observation']},
-  {g:'⚙️ Support / Enabling', paths:[
-    'Maintenance / Engineering','Facilities / Housekeeping','IT / Systems',
-    'Loss Prevention (LP)','HR / People / Training','Leadership / Admin','Other']},
+// NS FC sites — from Confluence: E2E Manual Endgame + NS Conversion Plan
+const NS_SITES = [
+  {code:'ATL2', city:'Carrollton, GA'},
+  {code:'ATL3', city:'Pendergrass, GA'},
+  {code:'BNA1', city:'Lebanon, TN'},
+  {code:'CVG1', city:'Monroe, OH'},
+  {code:'DFW2', city:'Fort Worth, TX'},
+  {code:'IND2', city:'Plainfield, IN'},
+  {code:'LAX2', city:'Chino, CA'},
+  {code:'LAX9', city:'Shafter, CA'},
+  {code:'MCO2', city:'Davenport, FL'},
+  {code:'MCI1', city:'Topeka, KS'},
+  {code:'PHL2', city:'Bethlehem, PA'},
+  {code:'PHL4', city:'Shippensburg, PA'},
+  {code:'PHX1', city:'Litchfield Park, AZ'},
+  {code:'SLC1', city:'Salt Lake City, UT'},
+  {code:'SMF1', city:'Sacramento, CA'},
 ];
+
+// Non-sort FC process paths — from Confluence: FCAM Activity Framework
+// Source: Non-Sortable FCs (SUPPLYCH) + Non-Sortable Launch Playbook (ECOMFC)
+const PROCESS_PATHS = [
+  {g:'🟦 IB – Inbound', paths:[
+    'Unloading',
+    'Receiving Management / GDM',
+    'Slotting',
+    'Hauling',
+    'Stocking (Pick Module – Eaches)',
+    'Putaway (Case / Pallet)',
+    'Topoff',
+    'First Time SKU (FTS)',
+    'Inbound Problem Solve (IPS)',
+    'ODV (Outbound Delivery Verification)',
+    'IB Exceptions / Rework',
+  ]},
+  {g:'🟧 OB – Outbound', paths:[
+    'Replenishment',
+    'Wave Drop / Work Assignment',
+    'Orderfilling / Picking',
+    'Packing (Non-Ship-As-Is)',
+    'Ship As Is (SAI) Processing',
+    'Non-Conveyable Handling',
+    'Staging / Sort',
+    'Loading / Shipping',
+    'OB Exceptions',
+  ]},
+  {g:'🟪 Returns', paths:[
+    'Returns Receive (RTV / RTF)',
+    'Returns Assess / Grade',
+    'Returns Stow',
+    'Returns Dispose / Liquidate',
+  ]},
+  {g:'🟫 Inventory Control', paths:[
+    'Cycle Count',
+    'Research & Reconcile',
+    'Location Audit',
+    'Lost & Found',
+  ]},
+  {g:'⬜ Quality & Safety', paths:[
+    'Inbound Quality Check',
+    'Outbound Quality Check',
+    'Defect Investigation',
+    'SOP Compliance Audit',
+    'Safety Observation',
+  ]},
+  {g:'⚙️ Support / Enabling', paths:[
+    'Maintenance / Engineering',
+    'Facilities / Housekeeping',
+    'IT / Systems',
+    'Loss Prevention (LP)',
+    'HR / People / Training',
+    'Leadership / Admin',
+    'Other',
+  ]},
+];
+
+function buildSiteSelect(){
+  const sel = document.getElementById('id-site');
+  sel.innerHTML = '<option value="">— Select your FC —</option>' +
+    NS_SITES.map(s=>`<option value="${s.code}">${s.code} – ${s.city}</option>`).join('');
+}
 
 function buildPathSelects(){
   const html = PROCESS_PATHS.map(g=>
     `<optgroup label="${g.g}">${g.paths.map(p=>`<option>${p}</option>`).join('')}</optgroup>`
   ).join('');
-  document.getElementById('id-dept').innerHTML +=  html;
+  document.getElementById('id-dept').innerHTML  += html;
   document.getElementById('det-path').innerHTML += html;
 }
 
@@ -448,21 +505,34 @@ function goHome(){
 function loadIdentity(){
   const id = JSON.parse(localStorage.getItem('fmo_identity')||'null');
   if(id){
-    document.getElementById('home-user').textContent = '👤 '+id.name.split(' ')[0];
-    document.getElementById('home-shift-dept').textContent = id.shift+' Shift · '+id.dept;
+    document.getElementById('id-name').value  = id.name  || '';
+    document.getElementById('id-site').value  = id.site  || '';
+    document.getElementById('id-shift').value = id.shift || 'AM';
+    document.getElementById('id-dept').value  = id.dept  || '';
+    _applyIdentityToUI(id);
     goHome();
   }
 }
 
+function _applyIdentityToUI(id){
+  const siteInfo = NS_SITES.find(s=>s.code===id.site);
+  const siteLabel = siteInfo ? `${id.site} · ${siteInfo.city}` : (id.site||'NS FC');
+  document.getElementById('home-site-label').textContent = `Walmart · ${siteLabel}`;
+  document.getElementById('home-user').textContent = '👤 '+id.name.split(' ')[0];
+  document.getElementById('home-shift-dept').textContent = id.shift+' Shift · '+id.dept;
+}
+
 function saveIdentity(){
-  const name = document.getElementById('id-name').value.trim();
+  const name  = document.getElementById('id-name').value.trim();
+  const site  = document.getElementById('id-site').value;
   const shift = document.getElementById('id-shift').value;
   const dept  = document.getElementById('id-dept').value;
   if(!name){alert('Please enter your name.'); return;}
-  if(!dept){alert('Please select your department.'); return;}
-  localStorage.setItem('fmo_identity', JSON.stringify({name,shift,dept}));
-  document.getElementById('home-user').textContent = '👤 '+name.split(' ')[0];
-  document.getElementById('home-shift-dept').textContent = shift+' Shift · '+dept;
+  if(!site){alert('Please select your NS site.'); return;}
+  if(!dept){alert('Please select your process path.'); return;}
+  const id = {name, site, shift, dept};
+  localStorage.setItem('fmo_identity', JSON.stringify(id));
+  _applyIdentityToUI(id);
   renderSession();
   show('s-home');
 }
@@ -528,6 +598,8 @@ function buildReview(){
   const pathNote = obs.path_override && obs.path_override !== id.dept
     ? ` <span style="font-size:.7rem;color:var(--muted)">(your area: ${id.dept})</span>` : '';
   document.getElementById('review-card').innerHTML = `
+    <div class="kv"><span class="kv-key">Site</span>
+      <span class="kv-val">🏢 ${id.site||'—'}</span></div>
     <div class="kv"><span class="kv-key">Category</span>
       <span class="kv-val">${cat.icon||''} ${obs.category}</span></div>
     <div class="kv"><span class="kv-key">Severity</span>
@@ -554,6 +626,7 @@ async function submitObs(){
   const entry = {
     id: Date.now(),
     observer: id.name||'Anonymous',
+    site: id.site||'NS',
     shift: id.shift||'—',
     process_path: effectivePath,
     observer_area: id.dept||'General',
@@ -598,8 +671,9 @@ async function postToTeams(entry, url){
     "summary": `[FMO] ${entry.title}`,
     "sections":[{
       "activityTitle":`${cat.icon} ${entry.waste_category} — ${entry.title}`,
-      "activitySubtitle":`${entry.observer} · ${entry.shift} Shift · ${entry.process_path}`,
+      "activitySubtitle":`${entry.observer} · ${entry.site} · ${entry.shift} Shift · ${entry.process_path}`,
       "facts":[
+        {"name":"Site","value":entry.site},
         {"name":"Severity","value":`${entry.severity}`},
         {"name":"Area","value":entry.process_path},
         {"name":"Observer","value":entry.observer},
@@ -637,7 +711,7 @@ function renderSession(){
       <div class="obs-dot" style="background:${sev.color}"></div>
       <div class="obs-info">
         <div class="obs-title">${e.title}</div>
-        <div class="obs-meta">${cat.icon} ${e.waste_category} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="obs-meta">${cat.icon} ${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
       </div>
       <span style="font-size:.72rem;font-weight:700;color:${sev.color}">${e.severity}</span>
     </div>`;
@@ -721,7 +795,7 @@ function renderBank(){
       <div class="obs-info">
         <div class="obs-title">${e.title}</div>
         <div class="obs-meta">${cat.icon} ${e.waste_category} &middot; ${e.process_path}</div>
-        <div class="obs-meta" style="margin-top:1px">${e.observer} &middot; ${dateStr} ${timeStr}</div>
+        <div class="obs-meta" style="margin-top:1px">${e.observer} &middot; ${e.site||''} &middot; ${dateStr} ${timeStr}</div>
       </div>
       <span style="font-size:.7rem;font-weight:800;color:${sev.color};white:nowrap">${e.severity}</span>
     </div>`;
@@ -745,6 +819,8 @@ function openDetail(id){
       <span class="kv-val" style="color:${sev.color}">${sev.icon} ${e.severity}</span></div>
     <div class="kv"><span class="kv-key">Process Path</span>
       <span class="kv-val">${e.process_path}</span></div>
+    <div class="kv"><span class="kv-key">Site</span>
+      <span class="kv-val">🏢 ${e.site||'—'}</span></div>
     <div class="kv"><span class="kv-key">Observer</span>
       <span class="kv-val">${e.observer}</span></div>
     <div class="kv"><span class="kv-key">Shift</span>
@@ -778,7 +854,7 @@ function exportBank(){
   const records = filteredBank();
   const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
   // Build CSV
-  const cols = ['id','timestamp','observer','shift','process_path',
+  const cols = ['id','timestamp','site','observer','shift','process_path',
                  'waste_category','severity','title','description'];
   const esc = v => '"'+String(v||'').replace(/"/g,'""')+'"';
   const csv = [cols.join(','),
@@ -821,6 +897,7 @@ function startObs(){
 
 // ── Init ──────────────────────────────────────────────────────────
 (function init(){
+  buildSiteSelect();
   buildPathSelects();
   const wUrl = localStorage.getItem('fmo_webhook');
   if(wUrl) document.getElementById('wh-url').value = wUrl;

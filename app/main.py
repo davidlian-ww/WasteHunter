@@ -12,7 +12,7 @@ import base64
 import io
 import qrcode
 import threading
-from datetime import datetime
+from app.ns_seeder import seed_ns_sites
 
 from app.sharepoint_sync import (
     sync_from_sharepoint, sync_from_teams, import_from_json_export,
@@ -47,6 +47,7 @@ templates = Jinja2Templates(directory="app/templates")
 @app.on_event("startup")
 async def startup():
     init_db()
+    seed_ns_sites()
 
 
 @app.get("/health")
