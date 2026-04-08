@@ -1,0 +1,98 @@
+{# Entire div IS the swap target — id must stay here #}
+<div id="feed-container" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" style="min-height:520px">
+
+  {# OOB stat updates so the KPI bar refreshes after quick-log #}
+  {% if total_observations is defined %}
+  <span id="stat-total" hx-swap-oob="true">{{ total_observations }}</span>
+  <span id="stat-open"  hx-swap-oob="true">{{ open_observations }}</span>
+  <span id="stat-paths" hx-swap-oob="true">{{ total_paths }}</span>
+  <datalist id="path-list" hx-swap-oob="true">
+    {% for name in path_names %}<option value="{{ name }}">{% endfor %}
+  </datalist>
+  {% endif %}
+
+  {# Header #}
+  <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-lg font-bold text-gray-900">📡 Live Observations</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Most recent first · auto-updates on log</p>
+    </div>
+    <button hx-get="/api/feed"
+            hx-target="#feed-container"
+            hx-swap="outerHTML"
+            class="text-sm px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition">
+      ↻ Refresh
+    </button>
+  </div>
+
+  {# Observation cards #}
+  {% if observations %}
+  <div class="divide-y divide-gray-100 overflow-y-auto" style="max-height:720px">
+    {% set cat_styles = {
+      'Transportation': {'icon':'🚛','color':'#dc2626','bg':'#fef2f2'},
+      'Inventory':      {'icon':'📦','color':'#ea580c','bg':'#fff7ed'},
+      'Motion':         {'icon':'🏃','color':'#ca8a04','bg':'#fefce8'},
+      'Waiting':        {'icon':'⏳','color':'#0053e2','bg':'#eff6ff'},
+      'Overproduction': {'icon':'📈','color':'#7c3aed','bg':'#f5f3ff'},
+      'Over-processing':{'icon':'⚙️','color':'#0891b2','bg':'#ecfeff'},
+      'Defects':        {'icon':'❌','color':'#dc2626','bg':'#fff1f2'},
+    } %}
+    {% set sev_styles = {
+      'Low':      {'color':'#2a8703','bg':'#f0fdf4'},
+      'Medium':   {'color':'#ca8a04','bg':'#fefce8'},
+      'High':     {'color':'#ea580c','bg':'#fff7ed'},
+      'Critical': {'color':'#dc2626','bg':'#fef2f2'},
+    } %}
+
+    {% for obs in observations %}
+    {% set cs = cat_styles.get(obs.waste_category, {'icon':'❓','color':'#6b7280','bg':'#f9fafb'}) %}
+    {% set ss = sev_styles.get(obs.severity,  {'color':'#6b7280','bg':'#f9fafb'}) %}
+
+    <div class="p-5" id="obs-{{ obs.id }}">
+
+      {# Top row: badges + timestamp #}
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <div class="flex flex-wrap gap-2">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                style="background:{{ cs.bg }};color:{{ cs.color }}">
+            {{ cs.icon }} {{ obs.waste_category }}
+          </span>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold"
+                style="background:{{ ss.bg }};color:{{ ss.color }}">
+            {{ obs.severity }}
+          </span>
+        </div>
+        <span class="text-xs text-gray-400 whitespace-nowrap">{{ obs.observed_at[:16].replace('T',' ') }}</span>
+      </div>
+
+      {# Title + path #}
+      <div class="font-semibold text-gray-900 text-sm mb-0.5">{{ obs.title }}</div>
+      <div class="text-xs text-gray-500 mb-1">
+        🛤️ <span class="font-medium">{{ obs.path_name }}</span>
+        &nbsp;·&nbsp; 👤 {{ obs.observed_by or 'Anonymous' }}
+      </div>
+
+      {# Description #}
+      {% if obs.description %}
+      <p class="text-xs text-gray-600 mb-3 leading-relaxed">{{ obs.description }}</p>
+      {% endif %}
+
+      {# ── Inline comments ───────────────────────── #}
+      <div id="comments-{{ obs.id }}">
+        {% include "components/inline_comments.html" %}
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  {# Empty state #}
+  <div class="flex flex-col items-center justify-center py-24 text-center px-6">
+    <div class="text-5xl mb-4">🔍</div>
+    <div class="text-lg font-semibold text-gray-700 mb-1">No observations yet</div>
+    <p class="text-sm text-gray-400">Use the form on the left to log your first Failure Mode Observation.</p>
+  </div>
+  {% endif %}
+
+</div>

@@ -12,7 +12,8 @@ from app.database import (
     get_waste_observations, create_waste_observation, get_comments,
     add_comment, get_dashboard_stats, update_observation_status,
     get_path_details, WASTE_CATEGORIES, create_failure_mode, get_failure_mode,
-    update_failure_mode, calculate_rpn, get_fma_analytics
+    update_failure_mode, calculate_rpn, get_fma_analytics,
+    quick_log_observation, get_all_process_path_names, get_recent_observations,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -33,23 +34,71 @@ async def health():
 # ── MAIN DASHBOARD ────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """Main dashboard with FMA analytics"""
+    """Main dashboard — log form + live observation feed."""
     stats = get_dashboard_stats()
-    fma_analytics = get_fma_analytics()
-
-    ctx = {
-        "total_sites": stats["total_sites"],
-        "total_paths": stats["total_paths"],
+    return templates.TemplateResponse(request, "fma_dashboard.html", {
+        "waste_categories": WASTE_CATEGORIES,
+        "path_names": get_all_process_path_names(),
+        "observations": get_recent_observations(),
         "total_observations": stats["total_observations"],
         "open_observations": stats["open_observations"],
-        "waste_by_category_json": json.dumps(stats["waste_by_category"]),
-        "severity_breakdown_json": json.dumps(stats["severity_breakdown"]),
-        "category_chart_json": json.dumps(fma_analytics["by_category"]),
-        "severity_dist_json": json.dumps(fma_analytics["severity_dist"]),
-        "fma_analytics": fma_analytics,
-    }
+        "total_paths": stats["total_paths"],
+    })
 
-    return templates.TemplateResponse(request, "fma_dashboard.html", ctx)
+
+# ── QUICK LOG (main entry point for new FMOs) ─────────────────────
+@app.post("/quick-log", response_class=HTMLResponse)
+async def quick_log(
+    request: Request,
+    process_path: str = Form(...),
+    waste_category: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(""),
+    severity: str = Form("Medium"),
+    observed_by: str = Form("Anonymous"),
+    initial_comment: str = Form(""),
+):
+    """Create one FMO and return the refreshed feed + updated stats."""
+    quick_log_observation(
+        process_path=process_path,
+        waste_category=waste_category,
+        title=title,
+        description=description,
+        severity=severity,
+        observed_by=observed_by,
+        initial_comment=initial_comment,
+    )
+    stats = get_dashboard_stats()
+    return templates.TemplateResponse(request, "components/observations_feed.html", {
+        "observations": get_recent_observations(),
+        "path_names": get_all_process_path_names(),
+        "total_observations": stats["total_observations"],
+        "open_observations": stats["open_observations"],
+        "total_paths": stats["total_paths"],
+    })
+
+
+# ── OBSERVATIONS FEED (HTMX partial) ──────────────────────────────
+@app.get("/api/feed", response_class=HTMLResponse)
+async def feed(request: Request):
+    """Return the live feed partial for polling / manual refresh."""
+    stats = get_dashboard_stats()
+    return templates.TemplateResponse(request, "components/observations_feed.html", {
+        "observations": get_recent_observations(),
+        "path_names": get_all_process_path_names(),
+        "total_observations": stats["total_observations"],
+        "open_observations": stats["open_observations"],
+        "total_paths": stats["total_paths"],
+    })
+
+
+# ── PROCESS PATH NAMES (datalist autocomplete) ────────────────────
+@app.get("/api/paths/names", response_class=HTMLResponse)
+async def path_names(request: Request):
+    """Return <option> tags for datalist autocomplete."""
+    names = get_all_process_path_names()
+    html = "".join(f'<option value="{n}">' for n in names)
+    return HTMLResponse(html)
 
 
 # ── FMA ANALYTICS PAGE ────────────────────────────────────────────
@@ -257,7 +306,7 @@ async def update_mitigation(
     })
 
 
-# ── COMMENTS ─────────────────────────────────────────────────────
+# ── COMMENTS ───────────────────────────────────────────────────
 @app.post("/observations/{obs_id}/comments", response_class=HTMLResponse)
 async def add_observation_comment(
     request: Request,
@@ -266,7 +315,7 @@ async def add_observation_comment(
     comment: str = Form(...),
 ):
     add_comment(obs_id, author, comment)
-    return templates.TemplateResponse(request, "components/comments_list.html", {
+    return templates.TemplateResponse(request, "components/inline_comments.html", {
         "comments": get_comments(obs_id),
         "obs_id": obs_id,
     })

@@ -1,0 +1,48 @@
+{# Works two ways:
+   1. Included in observations_feed — uses `obs.id` and `obs.comments`
+   2. Returned standalone by POST /observations/{id}/comments — uses `obs_id` and `comments`
+#}
+{% set _id = obs.id if obs is defined else obs_id %}
+{% set _comments = obs.comments if obs is defined else comments %}
+
+{% if _comments %}
+<div class="mb-3 space-y-2">
+  {% for c in _comments %}
+  <div class="flex gap-2">
+    <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+         style="background:#0053e2;margin-top:2px">
+      {{ (c.author or 'A')[0].upper() }}
+    </div>
+    <div class="flex-1 bg-gray-50 rounded-lg px-3 py-2">
+      <div class="flex items-baseline gap-2">
+        <span class="text-xs font-semibold text-gray-800">{{ c.author or 'Anonymous' }}</span>
+        <span class="text-xs text-gray-400">{{ c.created_at[:16].replace('T',' ') }}</span>
+      </div>
+      <p class="text-xs text-gray-600 mt-0.5 leading-relaxed">{{ c.comment }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# Add comment form #}
+<form hx-post="/observations/{{ _id }}/comments"
+      hx-target="#comments-{{ _id }}"
+      hx-swap="innerHTML"
+      hx-on--after-request="this.reset()"
+      class="flex gap-2 items-end">
+  <div class="w-28 flex-shrink-0">
+    <input name="author" placeholder="Your name"
+           class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1"
+           style="focus-ring-color:#0053e2">
+  </div>
+  <div class="flex-1">
+    <textarea name="comment" required rows="1" placeholder="Add a comment…"
+              class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 resize-none"></textarea>
+  </div>
+  <button type="submit"
+          class="px-3 py-1.5 rounded-lg text-white text-xs font-bold flex-shrink-0 hover:opacity-90 transition"
+          style="background:#0053e2;padding-bottom:7px">
+    💬
+  </button>
+</form>

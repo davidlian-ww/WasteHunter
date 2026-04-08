@@ -504,6 +504,129 @@ def update_observation_status(observation_id: int, status: str) -> None:
         )
 
 
+# ── QUICK LOG (user-facing entry point) ─────────────────────────
+_DEFAULT_SITE_NAME = "FMO Tracker"
+_DEFAULT_SITE_CODE = "FMO"
+
+
+def _ensure_default_site() -> int:
+    """Get or create the hidden default site."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT id FROM sites WHERE code = ?", (_DEFAULT_SITE_CODE,)
+        ).fetchone()
+        if row:
+            return row[0]
+        cursor.execute(
+            "INSERT INTO sites (name, code, type) VALUES (?, ?, 'FC')",
+            (_DEFAULT_SITE_NAME, _DEFAULT_SITE_CODE),
+        )
+        return cursor.lastrowid
+
+
+def get_or_create_process_path(path_name: str) -> int:
+    """Return the step_id for a path's 'General' step, creating as needed."""
+    site_id = _ensure_default_site()
+    path_name = path_name.strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Find existing path
+        row = cursor.execute(
+            "SELECT id FROM process_paths WHERE site_id = ? AND name = ?",
+            (site_id, path_name),
+        ).fetchone()
+        if row:
+            path_id = row[0]
+        else:
+            cursor.execute(
+                "INSERT INTO process_paths (site_id, name, created_by) VALUES (?, ?, 'Quick Log')",
+                (site_id, path_name),
+            )
+            path_id = cursor.lastrowid
+
+        # Find or create General step
+        step_row = cursor.execute(
+            "SELECT id FROM process_steps WHERE path_id = ? AND name = 'General'",
+            (path_id,),
+        ).fetchone()
+        if step_row:
+            return step_row[0]
+        cursor.execute(
+            "INSERT INTO process_steps (path_id, step_order, name) VALUES (?, 1, 'General')",
+            (path_id,),
+        )
+        return cursor.lastrowid
+
+
+def quick_log_observation(
+    process_path: str,
+    waste_category: str,
+    title: str,
+    description: str = "",
+    severity: str = "Medium",
+    observed_by: str = "Anonymous",
+    initial_comment: str = "",
+) -> int:
+    """One-shot: create observation (+ FMA + optional comment) from a path name."""
+    step_id = get_or_create_process_path(process_path)
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO waste_observations
+               (step_id, waste_category, title, description, severity, observed_by)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (step_id, waste_category, title, description, severity, observed_by),
+        )
+        obs_id = cursor.lastrowid
+        # Auto FMA record
+        cursor.execute(
+            """INSERT INTO failure_modes
+               (observation_id, occurrence_score, detection_score)
+               VALUES (?, 3, 3)""",
+            (obs_id,),
+        )
+        # Optional initial comment
+        if initial_comment.strip():
+            cursor.execute(
+                "INSERT INTO comments (observation_id, author, comment) VALUES (?, ?, ?)",
+                (obs_id, observed_by, initial_comment.strip()),
+            )
+    return obs_id
+
+
+def get_all_process_path_names() -> List[str]:
+    """Distinct path names for the datalist autocomplete."""
+    with get_db() as conn:
+        rows = conn.cursor().execute(
+            "SELECT DISTINCT name FROM process_paths ORDER BY name"
+        ).fetchall()
+        return [r[0] for r in rows]
+
+
+def get_recent_observations(limit: int = 50) -> List[Dict[str, Any]]:
+    """Recent observations enriched with path name and comment list."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        rows = cursor.execute(
+            """
+            SELECT wo.id, wo.title, wo.description, wo.waste_category,
+                   wo.severity, wo.status, wo.observed_by, wo.observed_at,
+                   pp.name AS path_name
+            FROM waste_observations wo
+            JOIN process_steps ps ON wo.step_id = ps.id
+            JOIN process_paths pp ON ps.path_id = pp.id
+            ORDER BY wo.observed_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        observations = [dict(r) for r in rows]
+        for obs in observations:
+            obs["comments"] = get_comments(obs["id"])
+        return observations
+
+
 def get_path_details(path_id: int) -> Optional[Dict[str, Any]]:
     """Get full details of a process path with steps and observations"""
     with get_db() as conn:

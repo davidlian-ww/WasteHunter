@@ -1,284 +1,252 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TIMWOOD Failure Mode Analysis Dashboard</title>
-    <link rel="stylesheet" href="/static/tailwind.min.css">
-    <script src="/static/chart.min.js"></script>
-    <style>
-        :root {
-            --primary: #0053e2;
-            --accent: #ffc220;
-            --error: #ea1100;
-            --success: #2a8703;
-            --warning-text: #995213;
-            --warning-bg: #fffbf0;
-        }
-        .primary-btn { @apply bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded font-medium transition; }
-        .secondary-btn { @apply bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded font-medium transition; }
-        .chart-container { position: relative; height: 350px; margin: 1rem 0; }
-    </style>
-</head>
-<body class="bg-gray-50">
-    <!-- Header -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="text-2xl font-bold text-blue-600">🔧 FMA Dashboard</div>
-                <span class="text-gray-500 text-sm">TIMWOOD Failure Mode Analysis</span>
-            </div>
-            <div class="flex gap-3">
-                <a href="/fma" class="secondary-btn">Analytics</a>
-                <a href="/paths" class="primary-btn">View Paths</a>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
+{% block title %}FMO Dashboard — TIMWOOD Waste Tracker{% endblock %}
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- KPI Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                <div class="text-gray-600 text-sm font-medium">Total Observations</div>
-                <div class="text-3xl font-bold text-gray-900 mt-2">{{ total_observations }}</div>
-                <div class="text-xs text-gray-500 mt-2">All waste findings</div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
-                <div class="text-gray-600 text-sm font-medium">Open Issues</div>
-                <div class="text-3xl font-bold text-gray-900 mt-2">{{ open_observations }}</div>
-                <div class="text-xs text-gray-500 mt-2">Awaiting resolution</div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                <div class="text-gray-600 text-sm font-medium">Total Sites</div>
-                <div class="text-3xl font-bold text-gray-900 mt-2">{{ total_sites }}</div>
-                <div class="text-xs text-gray-500 mt-2">Fulfillment centers</div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-                <div class="text-gray-600 text-sm font-medium">Process Paths</div>
-                <div class="text-3xl font-bold text-gray-900 mt-2">{{ total_paths }}</div>
-                <div class="text-xs text-gray-500 mt-2">Analyzed flows</div>
-            </div>
-        </div>
+{% block content %}
 
-        <!-- Charts Row 1 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Waste by Category -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Failures by TIMWOOD Category</h3>
-                <div class="chart-container">
-                    <canvas id="wasteByCategory"></canvas>
-                </div>
-            </div>
-            
-            <!-- Severity Distribution -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Severity Breakdown</h3>
-                <div class="chart-container">
-                    <canvas id="severityDist"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Row 2 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Avg RPN by Category -->
-            {% if fma_analytics.by_category %}
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Average RPN Score by Category</h3>
-                <div class="chart-container">
-                    <canvas id="rpnByCategory"></canvas>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Status Distribution -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Observation Status</h3>
-                <div class="chart-container">
-                    <canvas id="statusDist"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Executive Summary -->
-        <div class="bg-white rounded-lg shadow p-6 mb-8">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">📊 Executive Summary</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-2">Total Impact</h4>
-                    {% if fma_analytics.total_impact.total_cost %}
-                    <p class="text-2xl font-bold text-red-600">${{ "%.2f"|format(fma_analytics.total_impact.total_cost) }}</p>
-                    {% else %}
-                    <p class="text-gray-500">No cost data</p>
-                    {% endif %}
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-2">Hours Lost</h4>
-                    {% if fma_analytics.total_impact.total_hours %}
-                    <p class="text-2xl font-bold text-orange-600">{{ "%.1f"|format(fma_analytics.total_impact.total_hours) }} hrs</p>
-                    {% else %}
-                    <p class="text-gray-500">No hours data</p>
-                    {% endif %}
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-2">Failures Analyzed</h4>
-                    <p class="text-2xl font-bold text-blue-600">{{ fma_analytics.total_impact.total_failures or 0 }}</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top Failure Modes -->
-        {% if fma_analytics.top_by_rpn %}
-        <div class="bg-white rounded-lg shadow p-6 mb-8">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">🔴 Top 10 Failure Modes by RPN</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-900">Rank</th>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-900">Failure Mode</th>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-900">Category</th>
-                            <th class="px-4 py-3 text-center font-semibold text-gray-900">RPN</th>
-                            <th class="px-4 py-3 text-center font-semibold text-gray-900">Severity</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-900">Impact</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for fm in fma_analytics.top_by_rpn %}
-                        <tr class="border-b border-gray-100 hover:bg-gray-50">
-                            <td class="px-4 py-3">
-                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{{ loop.index }}</span>
-                            </td>
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ fm.title }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ fm.waste_category }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="bg-red-100 text-red-800 px-3 py-1 rounded font-bold">{{ fm.rpn_score or 'N/A' }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="px-2 py-1 rounded text-xs font-semibold
-                                    {% if fm.severity == 'Critical' %} bg-red-100 text-red-800
-                                    {% elif fm.severity == 'High' %} bg-orange-100 text-orange-800
-                                    {% elif fm.severity == 'Medium' %} bg-yellow-100 text-yellow-800
-                                    {% else %} bg-green-100 text-green-800
-                                    {% endif %}">{{ fm.severity }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-right text-gray-600">${{ "%.2f"|format(fm.impact_cost or 0) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Quick Actions -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-6 border border-blue-200">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">⚡ Quick Actions</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <a href="/sites" class="primary-btn text-center">
-                    📍 Manage Sites
-                </a>
-                <a href="/paths" class="primary-btn text-center">
-                    🛤️ Create Paths
-                </a>
-                <a href="/fma" class="primary-btn text-center">
-                    📊 Full Analysis
-                </a>
-            </div>
-        </div>
+{# ── KPI BAR ──────────────────────────────────────────────────── #}
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style="background:#eff6ff">📋</div>
+    <div>
+      <div class="text-2xl font-bold text-gray-900" id="stat-total">{{ total_observations }}</div>
+      <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total FMOs</div>
     </div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style="background:#fff7ed">🔓</div>
+    <div>
+      <div class="text-2xl font-bold" style="color:#ea1100" id="stat-open">{{ open_observations }}</div>
+      <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Open Issues</div>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style="background:#f5f3ff">🛤️</div>
+    <div>
+      <div class="text-2xl font-bold text-gray-900" id="stat-paths">{{ total_paths }}</div>
+      <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Process Paths</div>
+    </div>
+  </div>
+</div>
 
-    <script>
-        // Parse data from template
-        const wasteByCategory = {{ waste_by_category_json|safe }};
-        const severityBreakdown = {{ severity_breakdown_json|safe }};
-        const categoryChart = {{ category_chart_json|safe }};
+{# ── TWO-COLUMN LAYOUT ────────────────────────────────────────── #}
+<div class="grid grid-cols-5 gap-6 items-start">
 
-        // Colors
-        const COLORS = ['#0053e2', '#ffc220', '#ea1100', '#2a8703', '#ff6b6b', '#4ecdc4', '#45b7d1'];
+  {# LEFT — LOG FORM #}
+  <div class="col-span-2">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100" style="background:linear-gradient(135deg,#0053e2,#0046c7)">
+        <h2 class="text-lg font-bold text-white">➕ Log New FMO</h2>
+        <p class="text-xs text-blue-200 mt-0.5">Failure Mode Observation</p>
+      </div>
 
-        // Chart 1: Waste by Category
-        new Chart(document.getElementById('wasteByCategory'), {
-            type: 'bar',
-            data: {
-                labels: wasteByCategory.map(d => d.waste_category),
-                datasets: [{
-                    label: 'Count',
-                    data: wasteByCategory.map(d => d.count),
-                    backgroundColor: COLORS,
-                    borderRadius: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
+      <form id="log-form"
+            hx-post="/quick-log"
+            hx-target="#feed-container"
+            hx-swap="outerHTML"
+            hx-on--after-request="onLogSuccess(event)"
+            class="p-6 space-y-5">
 
-        // Chart 2: Severity Distribution (Pie)
-        new Chart(document.getElementById('severityDist'), {
-            type: 'doughnut',
-            data: {
-                labels: severityBreakdown.map(d => d.severity),
-                datasets: [{
-                    data: severityBreakdown.map(d => d.count),
-                    backgroundColor: ['#2a8703', '#ffc220', '#ff9800', '#ea1100'],
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
+        {# Process Path #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+            Process Path <span class="text-red-500">*</span>
+          </label>
+          <input id="process-path-input"
+                 name="process_path"
+                 list="path-list"
+                 required
+                 autocomplete="off"
+                 placeholder="e.g. Inbound Receiving, Order Picking…"
+                 class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                 style="focus-ring-color:#0053e2">
+          <datalist id="path-list">
+            {% for name in path_names %}
+            <option value="{{ name }}">
+            {% endfor %}
+          </datalist>
+          <p class="text-xs text-gray-400 mt-1">Type a new name or pick an existing path.</p>
+        </div>
 
-        // Chart 3: Avg RPN by Category
-        if (categoryChart && categoryChart.length > 0) {
-            new Chart(document.getElementById('rpnByCategory'), {
-                type: 'bar',
-                data: {
-                    labels: categoryChart.map(d => d.waste_category),
-                    datasets: [{
-                        label: 'Average RPN Score',
-                        data: categoryChart.map(d => d.avg_rpn || 0),
-                        backgroundColor: '#0053e2',
-                        borderRadius: 6,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
-        }
+        {# TIMWOOD Category #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            Waste Category <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="waste-category-input" name="waste_category" value="" required>
+          <div class="grid grid-cols-4 gap-2" id="cat-grid">
+            {% set cats = [
+              ('T','Transportation','🚛','#dc2626','#fef2f2'),
+              ('I','Inventory','📦','#ea580c','#fff7ed'),
+              ('M','Motion','🏃','#ca8a04','#fefce8'),
+              ('W','Waiting','⏳','#0053e2','#eff6ff'),
+              ('O','Overproduction','📈','#7c3aed','#f5f3ff'),
+              ('O','Over-processing','⚙️','#0891b2','#ecfeff'),
+              ('D','Defects','❌','#dc2626','#fff1f2')
+            ] %}
+            {% for letter, name, icon, color, bgc in cats %}
+            <button type="button"
+                    data-category="{{ name }}"
+                    onclick="selectCategory(this)"
+                    class="cat-btn flex flex-col items-center p-2 rounded-lg border-2 border-gray-200 bg-gray-50 hover:border-gray-400 transition-all text-center cursor-pointer">
+              <span class="text-xl leading-none">{{ icon }}</span>
+              <span class="text-xs font-bold mt-1" style="color:{{ color }}">{{ letter }}</span>
+              <span class="text-xs text-gray-500 leading-tight mt-0.5" style="font-size:0.6rem">{{ name.split('-')[0] }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          <p id="cat-error" class="text-xs text-red-500 mt-1 hidden">Please select a waste category.</p>
+        </div>
 
-        // Chart 4: Status Distribution
-        const statuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
-        new Chart(document.getElementById('statusDist'), {
-            type: 'pie',
-            data: {
-                labels: statuses,
-                datasets: [{
-                    data: [{{ open_observations }}, 0, 0, 0],
-                    backgroundColor: ['#ea1100', '#ffc220', '#2a8703', '#0053e2'],
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
-    </script>
-</body>
-</html>
+        {# Title #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+            Observation Title <span class="text-red-500">*</span>
+          </label>
+          <input name="title" required maxlength="120"
+                 placeholder="Brief description of the waste observed…"
+                 class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2">
+        </div>
+
+        {# Description #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Details</label>
+          <textarea name="description" rows="2" maxlength="500"
+                    placeholder="What did you see? What was the impact?"
+                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+        </div>
+
+        {# Severity #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Severity</label>
+          <input type="hidden" id="severity-input" name="severity" value="Medium">
+          <div class="flex gap-2" id="sev-grid">
+            {% for sev, color, bg in [('Low','#2a8703','#f0fdf4'),('Medium','#ca8a04','#fefce8'),('High','#ea580c','#fff7ed'),('Critical','#dc2626','#fef2f2')] %}
+            <button type="button"
+                    data-severity="{{ sev }}"
+                    onclick="selectSeverity(this)"
+                    class="sev-btn flex-1 py-2 rounded-lg border-2 text-xs font-bold transition-all"
+                    style="border-color:{{ color }}20; background:{{ bg }}; color:{{ color }}"
+                    {% if sev == 'Medium' %}data-selected="true"{% endif %}>
+              {{ sev }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Observer #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Your Name</label>
+          <input name="observed_by" placeholder="Anonymous"
+                 class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2">
+        </div>
+
+        {# Initial Comment #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+            Initial Comment <span class="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <textarea name="initial_comment" rows="2" maxlength="500"
+                    placeholder="Add any context, root cause ideas, or follow-up notes…"
+                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+        </div>
+
+        <button type="submit"
+                class="w-full py-3 rounded-lg font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95"
+                style="background:#0053e2">
+          <span class="htmx-indicator inline-block">
+            <svg class="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </span>
+          Log FMO →
+        </button>
+
+      </form>
+
+      {# Success toast #}
+      <div id="log-success"
+           class="hidden mx-6 mb-4 px-4 py-3 rounded-lg text-sm font-medium text-white"
+           style="background:#2a8703">
+        ✅ FMO logged successfully!
+      </div>
+    </div>
+  </div>
+
+  {# RIGHT — LIVE FEED #}
+  <div class="col-span-3">
+    {% include "components/observations_feed.html" %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  /* ── Category selector ─────────────────────────── */
+  function selectCategory(btn) {
+    document.querySelectorAll('.cat-btn').forEach(b => {
+      b.style.borderColor = '#e5e7eb';
+      b.style.background  = '#f9fafb';
+      b.removeAttribute('data-selected');
+    });
+    btn.style.borderColor = '#0053e2';
+    btn.style.background  = '#eff6ff';
+    btn.setAttribute('data-selected', 'true');
+    document.getElementById('waste-category-input').value = btn.dataset.category;
+    document.getElementById('cat-error').classList.add('hidden');
+  }
+
+  /* ── Severity selector ─────────────────────────── */
+  const SEV_STYLES = {
+    Low:      {color:'#2a8703', bg:'#f0fdf4'},
+    Medium:   {color:'#ca8a04', bg:'#fefce8'},
+    High:     {color:'#ea580c', bg:'#fff7ed'},
+    Critical: {color:'#dc2626', bg:'#fef2f2'},
+  };
+
+  function selectSeverity(btn) {
+    document.querySelectorAll('.sev-btn').forEach(b => {
+      const s = SEV_STYLES[b.dataset.severity];
+      b.style.borderColor = s.color + '20';
+      b.style.background  = s.bg;
+      b.style.opacity     = '0.7';
+      b.removeAttribute('data-selected');
+    });
+    btn.style.borderColor = SEV_STYLES[btn.dataset.severity].color;
+    btn.style.opacity     = '1';
+    btn.setAttribute('data-selected', 'true');
+    document.getElementById('severity-input').value = btn.dataset.severity;
+  }
+
+  // Init Medium as selected
+  selectSeverity(document.querySelector('.sev-btn[data-severity="Medium"]'));
+
+  /* ── Post-submit reset ─────────────────────────── */
+  function onLogSuccess(e) {
+    if (!e.detail.successful) return;
+    const path = document.getElementById('process-path-input').value;
+    document.getElementById('log-form').reset();
+    document.getElementById('process-path-input').value = path; // keep path
+    document.getElementById('waste-category-input').value = '';
+    document.getElementById('severity-input').value = 'Medium';
+    document.querySelectorAll('.cat-btn').forEach(b => {
+      b.style.borderColor = '#e5e7eb';
+      b.style.background  = '#f9fafb';
+    });
+    selectSeverity(document.querySelector('.sev-btn[data-severity="Medium"]'));
+
+    const toast = document.getElementById('log-success');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+  }
+
+  /* ── Validate category before submit ───────────── */
+  document.getElementById('log-form').addEventListener('submit', function(e) {
+    if (!document.getElementById('waste-category-input').value) {
+      e.preventDefault();
+      document.getElementById('cat-error').classList.remove('hidden');
+    }
+  });
+</script>
+{% endblock %}
