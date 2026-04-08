@@ -1,15 +1,32 @@
 """Main FastAPI application for TIMWOOD Waste Dashboard with FMA Analysis"""
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+import csv
+import io as _io
 import json
 import socket
 import base64
 import io
 import qrcode
+import threading
+from datetime import datetime
 
+from app.sharepoint_sync import (
+    sync_from_sharepoint, get_access_token, DeviceCodeRequired,
+    SHAREPOINT_FORM_URL,
+)
+
+# In-memory sync state (reset on server restart)
+_sync_state: dict = {
+    "status":      "idle",   # idle | needs_auth | syncing | done | error
+    "device_msg":  None,     # shown to user when device-code needed
+    "device_flow": None,     # the msal flow object
+    "last_sync":   None,
+    "last_result": None,
+}
 from app.database import (
     init_db, get_all_sites, create_site, get_process_paths,
     create_process_path, get_process_steps, add_process_step,
@@ -68,13 +85,15 @@ def _make_qr_b64(url: str) -> str:
 # ── SHARE PAGE ───────────────────────────────────────────────────
 @app.get("/share", response_class=HTMLResponse)
 async def share_page(request: Request):
-    """Shareable QR page — show this on your screen for floor leaders to scan."""
-    ip = _lan_ip()
+    """Shareable QR page — local server URL + SharePoint form URL."""
+    ip  = _lan_ip()
     url = f"http://{ip}:8001"
     return templates.TemplateResponse(request, "share.html", {
-        "url": url,
-        "ip": ip,
-        "qr_b64": _make_qr_b64(url),
+        "url":        url,
+        "ip":         ip,
+        "qr_b64":     _make_qr_b64(url),
+        "sp_url":     SHAREPOINT_FORM_URL,
+        "sp_qr_b64":  _make_qr_b64(SHAREPOINT_FORM_URL),
     })
 
 
@@ -374,6 +393,91 @@ async def import_csv(request: Request, file: UploadFile = File(...)):
         "total_observations": stats["total_observations"],
         "open_observations": stats["open_observations"],
         "total_paths": stats["total_paths"],
+    })
+
+
+# ── SHAREPOINT SYNC ───────────────────────────────────────────────
+@app.get("/sync/sharepoint", response_class=JSONResponse)
+async def sync_sharepoint():
+    """Sync FMO Observations from SharePoint list into SQLite.
+    First call may return a device-code challenge if not yet authenticated.
+    """
+    global _sync_state
+    if _sync_state["status"] == "syncing":
+        return JSONResponse({"status": "syncing", "message": "Sync already in progress…"})
+
+    # Try silent token first
+    try:
+        token = get_access_token()
+    except DeviceCodeRequired as dcr:
+        _sync_state.update({
+            "status":      "needs_auth",
+            "device_msg":  dcr.message,
+            "device_flow": dcr,
+        })
+        return JSONResponse({
+            "status":  "needs_auth",
+            "message": dcr.message,
+        })
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+    if not token:
+        return JSONResponse({"status": "error", "message": "Could not acquire token."}, status_code=500)
+
+    _sync_state["status"] = "syncing"
+    try:
+        result = sync_from_sharepoint(token)
+        _sync_state.update({
+            "status":      "done",
+            "last_sync":   datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "last_result": result,
+        })
+        return JSONResponse({"status": "done", **result})
+    except Exception as e:
+        _sync_state.update({"status": "error", "last_result": str(e)})
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.get("/sync/complete", response_class=JSONResponse)
+async def complete_sharepoint_auth():
+    """Call after user has completed the device-code sign-in. Finishes auth and syncs."""
+    global _sync_state
+    if _sync_state["status"] != "needs_auth" or not _sync_state.get("device_flow"):
+        return JSONResponse({"status": "error", "message": "No pending auth. Trigger /sync/sharepoint first."})
+
+    def _do_auth_and_sync():
+        global _sync_state
+        try:
+            dcr: DeviceCodeRequired = _sync_state["device_flow"]
+            token = dcr.complete()  # blocks until signed in
+            if not token:
+                _sync_state.update({"status": "error", "last_result": "Auth failed — no token returned."})
+                return
+            result = sync_from_sharepoint(token)
+            _sync_state.update({
+                "status":      "done",
+                "last_sync":   datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "last_result": result,
+                "device_msg":  None,
+                "device_flow": None,
+            })
+        except Exception as e:
+            _sync_state.update({"status": "error", "last_result": str(e)})
+
+    t = threading.Thread(target=_do_auth_and_sync, daemon=True)
+    t.start()
+    _sync_state["status"] = "syncing"
+    return JSONResponse({"status": "syncing", "message": "Auth completing in background. Sync will run automatically."})
+
+
+@app.get("/sync/status", response_class=JSONResponse)
+async def sync_status():
+    return JSONResponse({
+        "status":      _sync_state["status"],
+        "last_sync":   _sync_state["last_sync"],
+        "last_result": _sync_state["last_result"],
+        "sp_form_url": SHAREPOINT_FORM_URL,
     })
 
 
