@@ -17,18 +17,97 @@
 
   <div class="w-full max-w-md">
 
-    {# ── Main card ── #}
-    <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+    {# ── Atlas PWA card (primary — works on ALL devices) ── #}
+    <div class="bg-white rounded-3xl shadow-2xl overflow-hidden mb-5">
 
-      {# Header #}
-      <div class="px-8 py-6 text-center" style="background:#0053e2">
-        <div class="text-4xl mb-2">🗑️</div>
-        <h1 class="text-xl font-black text-white tracking-tight">TIMWOOD FMO Tracker</h1>
-        <p class="text-blue-200 text-sm mt-0.5">Scan to log waste observations</p>
+      <div class="px-8 py-5 text-center" style="background:linear-gradient(135deg,#1e293b 0%,#0053e2 100%)">
+        <div class="text-3xl mb-1">📋</div>
+        <h1 class="text-xl font-black text-white tracking-tight">Atlas FMO Audit App</h1>
+        <p class="text-blue-200 text-sm mt-0.5">Scan • Install • Log • Works anywhere</p>
       </div>
 
-      <div class="px-8 py-6">
+      <div class="px-8 py-5">
+        <div class="flex justify-center mb-4">
+          <div class="p-3 border-4 rounded-2xl" style="border-color:#1e293b">
+            <img src="{{ atlas_qr_b64 }}" alt="Atlas FMO PWA QR"
+                 class="w-64 h-64 block">
+          </div>
+        </div>
 
+        <div class="grid grid-cols-2 gap-2 mb-4 text-xs">
+          <div class="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold" style="background:#f0fdf4;color:#2a8703">
+            ✅ Any Walmart device
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold" style="background:#eff6ff;color:#0053e2">
+            📶 Any network
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold" style="background:#fefce8;color:#995213">
+            📥 Add to Home Screen
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold" style="background:#fef2f2;color:#ea1100">
+            🔒 No sign-in needed
+          </div>
+        </div>
+
+        <div class="flex gap-2 mb-2">
+          <div id="atlas-url-box"
+               class="flex-1 px-3 py-3 rounded-xl font-mono text-xs font-bold text-center select-all cursor-text break-all"
+               style="background:#f8fafc;color:#1e293b;border:2px solid #1e293b">
+            {{ atlas_url }}
+          </div>
+          <button onclick="copyAtlasUrl()"
+                  id="atlas-copy-btn"
+                  class="px-4 py-3 rounded-xl font-bold text-white text-sm flex-shrink-0 transition hover:opacity-90"
+                  style="background:#1e293b">
+            📋
+          </button>
+        </div>
+        <p class="text-center text-gray-400" style="font-size:.65rem">
+          Floor leaders scan once — tap “Add to Home Screen” for a permanent icon
+        </p>
+      </div>
+    </div>
+
+    {# ── Manager import card ── #}
+    <div class="bg-white rounded-3xl shadow-2xl overflow-hidden mb-5">
+      <div class="px-8 py-4 text-center" style="background:#0053e2">
+        <p class="text-xs font-black text-white uppercase tracking-widest">📈 Manager Import</p>
+        <p class="text-blue-200 text-sm font-semibold">Pull observations into your dashboard</p>
+      </div>
+      <div class="px-8 py-5">
+        <div class="space-y-3 text-sm text-gray-600">
+          <div class="flex items-start gap-3">
+            <span class="font-black text-blue-600 flex-shrink-0">1</span>
+            <span>Floor leaders tap <strong>Export JSON</strong> in the app at end of shift</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="font-black text-blue-600 flex-shrink-0">2</span>
+            <span>They share the file with you via Teams, email, or AirDrop</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="font-black text-blue-600 flex-shrink-0">3</span>
+            <span>You upload it at <strong>localhost:8001</strong> using Import JSON</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="font-black text-blue-600 flex-shrink-0">4</span>
+            <span>Or set up the <strong>Teams Webhook</strong> for instant live updates</span>
+          </div>
+        </div>
+        <a href="/" class="btn mt-4 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm text-white no-underline" style="background:#0053e2;text-decoration:none;display:flex">
+          📊 Open Dashboard
+        </a>
+      </div>
+    </div>
+
+    {# ── Local server card (fallback — Eagle WiFi only) ── #}
+    <details class="bg-white rounded-3xl shadow-2xl overflow-hidden mb-5">
+      <summary class="px-8 py-4 cursor-pointer list-none" style="background:#f8fafc">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-bold text-gray-500">💻 Local Server (Eagle WiFi only)</span>
+          <span class="text-gray-400 text-xs">tap to expand</span>
+        </div>
+      </summary>
+      <div class="px-8 py-6">
         {# QR Code — black on white, max camera compat #}
         <div class="flex justify-center mb-5">
           <div class="p-3 border-4 rounded-2xl" style="border-color:#0053e2">
@@ -75,7 +154,7 @@
         </div>
 
       </div>
-    </div>
+    </details>
 
     {# ── SharePoint card — works on ANY Walmart network ── #}
     <div class="bg-white rounded-3xl shadow-2xl overflow-hidden mt-5">
@@ -160,6 +239,17 @@
   </div>
 
   <script>
+    function copyAtlasUrl() {
+      navigator.clipboard.writeText('{{ atlas_url }}').then(() => {
+        const btn = document.getElementById('atlas-copy-btn');
+        btn.textContent = '✅';
+        setTimeout(() => { btn.textContent = '📋'; }, 2000);
+      }).catch(() => {
+        const box = document.getElementById('atlas-url-box');
+        const r = document.createRange(); r.selectNodeContents(box);
+        window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      });
+    }
     function copyUrl() {
       navigator.clipboard.writeText('{{ url }}').then(() => {
         const btn = document.getElementById('copy-btn');

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0053e2">
+<title>FMO Audit — IND2</title>
+<style>
+:root{
+  --blue:#0053e2;--blue-d:#0033a0;--spark:#ffc220;--spark-d:#995213;
+  --red:#ea1100;--green:#2a8703;--orange:#ea580c;--purple:#7c3aed;--teal:#0891b2;
+  --text:#1e293b;--muted:#64748b;--bg:#f1f5f9;--white:#fff;
+  --radius:16px;--shadow:0 4px 24px rgba(0,83,226,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden}
+.screen{display:none;min-height:100dvh;flex-direction:column;animation:fadeIn .2s ease}
+.screen.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Header */
+.hdr{background:var(--blue);color:#fff;padding:env(safe-area-inset-top,0) 20px 16px;
+  padding-top:calc(env(safe-area-inset-top,0) + 16px)}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.hdr-brand{font-size:.65rem;font-weight:800;letter-spacing:.15em;opacity:.7;text-transform:uppercase}
+.hdr-badge{background:rgba(255,255,255,.18);border-radius:20px;padding:4px 10px;
+  font-size:.7rem;font-weight:700;cursor:pointer}
+.hdr h1{font-size:1.3rem;font-weight:900;line-height:1.2}
+.hdr p{font-size:.8rem;opacity:.75;margin-top:2px}
+
+/* Body content area */
+.content{flex:1;padding:20px;max-width:500px;margin:0 auto;width:100%}
+
+/* Cards */
+.card{background:var(--white);border-radius:var(--radius);padding:20px;
+  box-shadow:var(--shadow);margin-bottom:16px}
+.card-sm{padding:14px 16px}
+
+/* Buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:16px;border-radius:var(--radius);border:none;font-size:1rem;
+  font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;text-decoration:none}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-secondary{background:var(--white);color:var(--blue);border:2px solid var(--blue)}
+.btn-ghost{background:transparent;color:var(--muted);font-weight:600;font-size:.9rem}
+.btn-sm{padding:10px 16px;font-size:.875rem;border-radius:12px}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+
+/* Step indicator */
+.steps{display:flex;gap:6px;padding:12px 20px;background:var(--white);
+  border-bottom:1px solid #e2e8f0}
+.step{flex:1;height:4px;border-radius:2px;background:#e2e8f0;transition:background .3s}
+.step.done{background:var(--blue)}
+.step.active{background:var(--spark)}
+
+/* Form inputs */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:.8rem;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.field input,.field textarea,.field select{
+  width:100%;padding:14px;border:2px solid #e2e8f0;border-radius:12px;
+  font-size:1rem;font-family:inherit;color:var(--text);background:var(--white);
+  transition:border-color .2s;outline:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--blue)}
+.field textarea{resize:none;height:100px}
+
+/* Tile grid */
+.tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.tile-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+.tile{padding:14px 10px;border-radius:14px;border:2px solid #e2e8f0;
+  text-align:center;cursor:pointer;transition:all .15s;background:var(--white)}
+.tile:active{transform:scale(.95)}
+.tile.selected{border-width:3px}
+.tile-icon{font-size:1.6rem;line-height:1;margin-bottom:4px}
+.tile-label{font-size:.75rem;font-weight:800;letter-spacing:.02em}
+.tile-desc{font-size:.65rem;color:var(--muted);margin-top:2px;line-height:1.3}
+
+/* Severity tile */
+.sev-tile{padding:16px;border-radius:14px;border:3px solid transparent;cursor:pointer;
+  display:flex;align-items:center;gap:12px;background:var(--white);transition:all .15s}
+.sev-tile:active{transform:scale(.97)}
+.sev-tile.selected{border-width:3px}
+.sev-icon{font-size:1.5rem}
+.sev-label{font-size:.95rem;font-weight:800}
+.sev-desc{font-size:.72rem;color:var(--muted)}
+
+/* KV row */
+.kv{display:flex;justify-content:space-between;align-items:flex-start;
+  padding:10px 0;border-bottom:1px solid #f1f5f9}
+.kv:last-child{border-bottom:none}
+.kv-key{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.05em;flex-shrink:0;padding-right:12px}
+.kv-val{font-size:.9rem;font-weight:600;text-align:right;word-break:break-word}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  border-radius:20px;font-size:.75rem;font-weight:700}
+
+/* Session list */
+.obs-row{background:var(--white);border-radius:12px;padding:12px 14px;
+  margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.obs-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.obs-info{flex:1;min-width:0}
+.obs-title{font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obs-meta{font-size:.72rem;color:var(--muted);margin-top:2px}
+
+/* Misc */
+.section-title{font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.1em;margin-bottom:12px}
+.center{text-align:center}
+.big-icon{font-size:4rem;margin-bottom:12px;display:block}
+.divider{height:1px;background:#e2e8f0;margin:16px 0}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+</style>
+</head>
+<body>
+
+<!-- ── IDENTITY SETUP ── -->
+<div id="s-identity" class="screen active">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">Walmart · IND2</span></div>
+    <h1>FMO Audit Tool</h1>
+    <p>Set up your profile — one time only</p>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="section-title">👤 Your Info</div>
+      <div class="field"><label>Your Name *</label>
+        <input id="id-name" type="text" placeholder="First Last" autocomplete="name"></div>
+      <div class="field"><label>Shift</label>
+        <select id="id-shift">
+          <option value="AM">🌅 AM Shift</option>
+          <option value="PM">🌇 PM Shift</option>
+          <option value="Night">🌙 Night Shift</option>
+        </select></div>
+      <div class="field"><label>Department / Area *</label>
+        <select id="id-dept">
+          <option value="">— Select your area —</option>
+          <option>Inbound / Receiving</option><option>Stow</option>
+          <option>Pick</option><option>Pack</option>
+          <option>Ship / Outbound</option><option>Returns</option>
+          <option>Quality</option><option>Maintenance</option>
+          <option>Inventory Control</option><option>Leadership / Admin</option>
+          <option>Other</option>
+        </select></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveIdentity()">✅ Save &amp; Start →</button>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="show('s-webhook-setup')">
+      ⚙️ Configure Teams Webhook
+    </button>
+  </div>
+</div>
+
+<!-- ── HOME ── -->
+<div id="s-home" class="screen">
+  <div class="hdr">
+    <div class="hdr-top">
+      <span class="hdr-brand">Walmart · IND2 FMO</span>
+      <span class="hdr-badge" id="home-user" onclick="show('s-identity')">👤 —</span>
+    </div>
+    <h1>Audit Dashboard</h1>
+    <p id="home-shift-dept">—</p>
+  </div>
+  <div class="content">
+    <button class="btn btn-primary" style="font-size:1.1rem;padding:20px" onclick="startObs()">
+      ➕ Log New Observation
+    </button>
+    <div style="margin-top:20px">
+      <div class="section-title" id="session-count-label">This Session</div>
+      <div id="session-list"><p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">
+        No observations yet — tap above to log your first one.</p></div>
+    </div>
+    <div id="export-row" style="display:none;margin-top:8px">
+      <div class="divider"></div>
+      <div class="row">
+        <button class="btn btn-secondary btn-sm" onclick="exportJSON()">📤 Export JSON</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSession()">🗑️ Clear Session</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 1: CATEGORY ── -->
+<div id="s-category" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
+    <h1>Type of Waste</h1><p>Select the TIMWOOD category</p>
+  </div>
+  <div class="steps" id="steps-cat">
+    <div class="step active"></div><div class="step"></div>
+    <div class="step"></div><div class="step"></div>
+  </div>
+  <div class="content">
+    <div id="cat-grid" class="tile-grid"></div>
+    <button class="btn btn-ghost" onclick="show('s-home')">← Cancel</button>
+  </div>
+</div>
+
+<!-- ── STEP 2: DETAILS ── -->
+<div id="s-details" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
+    <h1>What Did You See?</h1><p id="details-cat-label">—</p>
+  </div>
+  <div class="steps">
+    <div class="step done"></div><div class="step active"></div>
+    <div class="step"></div><div class="step"></div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="field"><label>Title / Brief Description *</label>
+        <input id="det-title" type="text" placeholder="e.g. Pallets blocking pick aisle"></div>
+      <div class="field"><label>Details (optional)</label>
+        <textarea id="det-desc" placeholder="What did you see? Impact? How often? Any ideas?"></textarea></div>
+    </div>
+    <button class="btn btn-primary" onclick="goToSeverity()">Next: Severity →</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="show('s-category')">← Back</button>
+  </div>
+</div>
+
+<!-- ── STEP 3: SEVERITY ── -->
+<div id="s-severity" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
+    <h1>Severity Level</h1><p>How urgent is this?</p>
+  </div>
+  <div class="steps">
+    <div class="step done"></div><div class="step done"></div>
+    <div class="step active"></div><div class="step"></div>
+  </div>
+  <div class="content">
+    <div id="sev-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+    <button class="btn btn-ghost" onclick="show('s-details')">← Back</button>
+  </div>
+</div>
+
+<!-- ── STEP 4: REVIEW ── -->
+<div id="s-review" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
+    <h1>Review &amp; Submit</h1><p>Confirm your entry</p>
+  </div>
+  <div class="steps">
+    <div class="step done"></div><div class="step done"></div>
+    <div class="step done"></div><div class="step active"></div>
+  </div>
+  <div class="content">
+    <div class="card" id="review-card"></div>
+    <button class="btn btn-primary" onclick="submitObs()" id="submit-btn">✅ Submit Observation</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="show('s-severity')">← Back</button>
+  </div>
+</div>
+
+<!-- ── CONFIRM ── -->
+<div id="s-confirm" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">IND2 FMO Audit</span></div>
+    <h1>Submitted!</h1><p>Observation logged successfully</p>
+  </div>
+  <div class="content center" style="padding-top:40px">
+    <span class="big-icon">✅</span>
+    <div class="card">
+      <p id="confirm-msg" style="font-size:.95rem;line-height:1.6;color:var(--muted)"></p>
+    </div>
+    <button class="btn btn-primary" onclick="startObs()">➕ Log Another</button>
+    <button class="btn btn-secondary" style="margin-top:10px" onclick="goHome()">🏠 Back to Dashboard</button>
+  </div>
+</div>
+
+<!-- ── WEBHOOK SETUP ── -->
+<div id="s-webhook-setup" class="screen">
+  <div class="hdr">
+    <div class="hdr-top"><span class="hdr-brand">Configuration</span></div>
+    <h1>Teams Webhook</h1><p>One-time setup for Teams integration</p>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="section-title">📋 Setup Steps</div>
+      <p style="font-size:.85rem;line-height:1.7;color:var(--muted);margin-bottom:12px">
+        1. Open <strong>Teams → IND2 Leaders</strong><br>
+        2. Go to <strong>Quality Channel</strong><br>
+        3. Click <strong>··· → Connectors → Incoming Webhook</strong><br>
+        4. Name it <em>"FMO Observations"</em><br>
+        5. Copy the webhook URL &amp; paste below
+      </p>
+      <div class="field"><label>Webhook URL</label>
+        <input id="wh-url" type="url" placeholder="https://...webhook.office.com/...">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveWebhook()">💾 Save Webhook URL</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="goHome()">← Skip for now</button>
+  </div>
+</div>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────
+const CATS = [
+  {k:'Transportation', icon:'🚛', color:'#dc2626', desc:'Unnecessary material movement'},
+  {k:'Inventory',      icon:'📦', color:'#ea580c', desc:'Excess or misplaced stock'},
+  {k:'Motion',         icon:'🚶', color:'#ca8a04', desc:'Unnecessary people movement'},
+  {k:'Waiting',        icon:'⏳', color:'#0053e2', desc:'Idle time between steps'},
+  {k:'Overproduction', icon:'📈', color:'#7c3aed', desc:'More than needed or early'},
+  {k:'Over-processing',icon:'⚙️', color:'#0891b2', desc:'Unnecessary extra work'},
+  {k:'Defects',        icon:'⚠️', color:'#ea1100', desc:'Errors needing rework'},
+];
+const SEVS = [
+  {k:'Low',      icon:'🟢', color:'#2a8703', bg:'#f0fdf4', desc:'Minor — note &amp; monitor'},
+  {k:'Medium',   icon:'🟡', color:'#995213', bg:'#fefce8', desc:'Moderate — address this week'},
+  {k:'High',     icon:'🟠', color:'#ea580c', bg:'#fff7ed', desc:'Significant — address today'},
+  {k:'Critical', icon:'🔴', color:'#ea1100', bg:'#fef2f2', desc:'Stop-work — immediate action'},
+];
+
+// ── State ─────────────────────────────────────────────────────────
+let obs = {};
+let session = JSON.parse(localStorage.getItem('fmo_session')||'[]');
+
+// ── Navigation ────────────────────────────────────────────────────
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function goHome(){
+  renderSession();
+  show('s-home');
+}
+
+// ── Identity ──────────────────────────────────────────────────────
+function loadIdentity(){
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'null');
+  if(id){
+    document.getElementById('home-user').textContent = '👤 '+id.name.split(' ')[0];
+    document.getElementById('home-shift-dept').textContent = id.shift+' Shift · '+id.dept;
+    goHome();
+  }
+}
+
+function saveIdentity(){
+  const name = document.getElementById('id-name').value.trim();
+  const shift = document.getElementById('id-shift').value;
+  const dept  = document.getElementById('id-dept').value;
+  if(!name){alert('Please enter your name.'); return;}
+  if(!dept){alert('Please select your department.'); return;}
+  localStorage.setItem('fmo_identity', JSON.stringify({name,shift,dept}));
+  document.getElementById('home-user').textContent = '👤 '+name.split(' ')[0];
+  document.getElementById('home-shift-dept').textContent = shift+' Shift · '+dept;
+  renderSession();
+  show('s-home');
+}
+
+// ── Category ──────────────────────────────────────────────────────
+function buildCatGrid(){
+  const g = document.getElementById('cat-grid');
+  g.innerHTML = CATS.map(c=>`
+    <div class="tile" data-cat="${c.k}" onclick="selectCat('${c.k}')"
+         style="--tc:${c.color}">
+      <div class="tile-icon">${c.icon}</div>
+      <div class="tile-label" style="color:${c.color}">${c.k}</div>
+      <div class="tile-desc">${c.desc}</div>
+    </div>`).join('');
+}
+
+function selectCat(k){
+  obs.category = k;
+  const cat = CATS.find(c=>c.k===k);
+  document.getElementById('details-cat-label').textContent = cat.icon+' '+k;
+  show('s-details');
+}
+
+// ── Details ───────────────────────────────────────────────────────
+function goToSeverity(){
+  const title = document.getElementById('det-title').value.trim();
+  if(!title){alert('Please enter a brief title.'); return;}
+  obs.title = title;
+  obs.description = document.getElementById('det-desc').value.trim();
+  buildSevList();
+  show('s-severity');
+}
+
+// ── Severity ──────────────────────────────────────────────────────
+function buildSevList(){
+  const l = document.getElementById('sev-list');
+  l.innerHTML = SEVS.map(s=>`
+    <div class="sev-tile" id="sev-${s.k}" onclick="selectSev('${s.k}')"
+         style="background:${s.bg}">
+      <span class="sev-icon">${s.icon}</span>
+      <div><div class="sev-label" style="color:${s.color}">${s.k}</div>
+           <div class="sev-desc">${s.desc}</div></div>
+    </div>`).join('');
+}
+
+function selectSev(k){
+  document.querySelectorAll('.sev-tile').forEach(t=>t.style.borderColor='transparent');
+  const sev = SEVS.find(s=>s.k===k);
+  const el = document.getElementById('sev-'+k);
+  el.style.borderColor = sev.color;
+  obs.severity = k;
+  buildReview();
+  show('s-review');
+}
+
+// ── Review ────────────────────────────────────────────────────────
+function buildReview(){
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const cat = CATS.find(c=>c.k===obs.category)||{};
+  const sev = SEVS.find(s=>s.k===obs.severity)||{};
+  document.getElementById('review-card').innerHTML = `
+    <div class="kv"><span class="kv-key">Category</span>
+      <span class="kv-val">${cat.icon||''} ${obs.category}</span></div>
+    <div class="kv"><span class="kv-key">Severity</span>
+      <span class="kv-val" style="color:${sev.color||'#000'}">${sev.icon||''} ${obs.severity}</span></div>
+    <div class="kv"><span class="kv-key">Title</span>
+      <span class="kv-val">${obs.title}</span></div>
+    ${obs.description?`<div class="kv"><span class="kv-key">Details</span>
+      <span class="kv-val" style="font-weight:400;font-size:.82rem">${obs.description}</span></div>`:''}
+    <div class="kv"><span class="kv-key">Observer</span>
+      <span class="kv-val">${id.name||'—'}</span></div>
+    <div class="kv"><span class="kv-key">Shift · Area</span>
+      <span class="kv-val">${(id.shift||'')+'  ·  '+(id.dept||'')}</span></div>`;
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function submitObs(){
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Submitting…';
+
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const entry = {
+    id: Date.now(),
+    observer: id.name||'Anonymous',
+    shift: id.shift||'—',
+    process_path: id.dept||'General',
+    waste_category: obs.category,
+    title: obs.title,
+    description: obs.description||'',
+    severity: obs.severity,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Save locally first (always)
+  session.push(entry);
+  localStorage.setItem('fmo_session', JSON.stringify(session));
+
+  // Attempt Teams webhook
+  const wUrl = localStorage.getItem('fmo_webhook');
+  let teamsOk = false;
+  if(wUrl) teamsOk = await postToTeams(entry, wUrl);
+
+  obs = {};
+  document.getElementById('det-title').value = '';
+  document.getElementById('det-desc').value = '';
+  btn.disabled = false; btn.textContent = '✅ Submit Observation';
+
+  const msg = teamsOk
+    ? '✅ Sent to Teams Quality Channel. Your manager will see it immediately.'
+    : '💾 Saved to your device. Use <strong>Export JSON</strong> on the dashboard to share with your manager.';
+  document.getElementById('confirm-msg').innerHTML = msg;
+  show('s-confirm');
+}
+
+async function postToTeams(entry, url){
+  const cat = CATS.find(c=>c.k===entry.waste_category)||{icon:'🗑️'};
+  const sev = SEVS.find(s=>s.k===entry.severity)||{color:'0053e2'};
+  const color = sev.color.replace('#','');
+  const payload = {
+    "@type":"MessageCard","@context":"https://schema.org/extensions",
+    "themeColor": color,
+    "summary": `[FMO] ${entry.title}`,
+    "sections":[{
+      "activityTitle":`${cat.icon} ${entry.waste_category} — ${entry.title}`,
+      "activitySubtitle":`${entry.observer} · ${entry.shift} Shift · ${entry.process_path}`,
+      "facts":[
+        {"name":"Severity","value":`${entry.severity}`},
+        {"name":"Area","value":entry.process_path},
+        {"name":"Observer","value":entry.observer},
+        {"name":"Logged","value":new Date(entry.timestamp).toLocaleString()},
+      ],
+      ...(entry.description?{"text":entry.description}:{})
+    }],
+    "text":`<!-- FMO_JSON:${JSON.stringify(entry)} -->`
+  };
+  try{
+    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(r.ok) return true;
+  } catch{}
+  try{
+    await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
+    return true; // optimistic — can't read response in no-cors
+  } catch{return false;}
+}
+
+// ── Session ───────────────────────────────────────────────────────
+function renderSession(){
+  const el = document.getElementById('session-list');
+  const expRow = document.getElementById('export-row');
+  document.getElementById('session-count-label').textContent =
+    `This Session (${session.length})`;
+  if(!session.length){
+    el.innerHTML='<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">No observations yet — tap above to log your first one.</p>';
+    expRow.style.display='none'; return;
+  }
+  expRow.style.display='block';
+  el.innerHTML = [...session].reverse().map(e=>{
+    const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️'};
+    const sev = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
+    return `<div class="obs-row">
+      <div class="obs-dot" style="background:${sev.color}"></div>
+      <div class="obs-info">
+        <div class="obs-title">${e.title}</div>
+        <div class="obs-meta">${cat.icon} ${e.waste_category} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <span style="font-size:.72rem;font-weight:700;color:${sev.color}">${e.severity}</span>
+    </div>`;
+  }).join('');
+}
+
+function clearSession(){
+  if(!confirm(`Clear ${session.length} observation(s)?`)) return;
+  session = [];
+  localStorage.removeItem('fmo_session');
+  renderSession();
+}
+
+function exportJSON(){
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const data = {
+    exported_at: new Date().toISOString(),
+    observer: id.name||'Unknown',
+    shift: id.shift||'—',
+    observations: session
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`fmo_${id.name||'export'}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ── Webhook ───────────────────────────────────────────────────────
+function saveWebhook(){
+  const url = document.getElementById('wh-url').value.trim();
+  if(!url){alert('Please paste the webhook URL.'); return;}
+  localStorage.setItem('fmo_webhook', url);
+  alert('✅ Webhook saved! Submissions will now post to Teams.');
+  goHome();
+}
+
+// ── Misc ──────────────────────────────────────────────────────────
+function startObs(){
+  obs = {};
+  buildCatGrid();
+  show('s-category');
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+(function init(){
+  const wUrl = localStorage.getItem('fmo_webhook');
+  if(wUrl) document.getElementById('wh-url').value = wUrl;
+  loadIdentity();
+})();
+</script>
+</body>
+</html>

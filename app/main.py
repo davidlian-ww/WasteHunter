@@ -15,7 +15,8 @@ import threading
 from datetime import datetime
 
 from app.sharepoint_sync import (
-    sync_from_sharepoint, get_access_token, DeviceCodeRequired,
+    sync_from_sharepoint, sync_from_teams, import_from_json_export,
+    get_access_token, DeviceCodeRequired,
     SHAREPOINT_FORM_URL,
 )
 
@@ -83,17 +84,21 @@ def _make_qr_b64(url: str) -> str:
 
 
 # ── SHARE PAGE ───────────────────────────────────────────────────
+_ATLAS_PWA_URL = "https://puppy.walmart.com/sharing/d0l0ka3/atlas-fmo-audit-tool"
+
 @app.get("/share", response_class=HTMLResponse)
 async def share_page(request: Request):
-    """Shareable QR page — local server URL + SharePoint form URL."""
+    """Shareable QR page — Atlas PWA + local server + SharePoint form."""
     ip  = _lan_ip()
     url = f"http://{ip}:8001"
     return templates.TemplateResponse(request, "share.html", {
-        "url":        url,
-        "ip":         ip,
-        "qr_b64":     _make_qr_b64(url),
-        "sp_url":     SHAREPOINT_FORM_URL,
-        "sp_qr_b64":  _make_qr_b64(SHAREPOINT_FORM_URL),
+        "url":         url,
+        "ip":          ip,
+        "qr_b64":      _make_qr_b64(url),
+        "sp_url":      SHAREPOINT_FORM_URL,
+        "sp_qr_b64":   _make_qr_b64(SHAREPOINT_FORM_URL),
+        "atlas_url":   _ATLAS_PWA_URL,
+        "atlas_qr_b64": _make_qr_b64(_ATLAS_PWA_URL),
     })
 
 
@@ -480,8 +485,52 @@ async def sync_status():
         "sp_form_url": SHAREPOINT_FORM_URL,
     })
 
+# ── TEAMS CHANNEL SYNC ────────────────────────────────────────────
+@app.get("/sync/teams", response_class=JSONResponse)
+async def sync_teams():
+    """Pull FMO_JSON submissions from IND2 Quality Channel into SQLite."""
+    global _sync_state
+    try:
+        token = get_access_token()
+    except DeviceCodeRequired as dcr:
+        _sync_state.update({"status": "needs_auth", "device_msg": dcr.message, "device_flow": dcr})
+        return JSONResponse({"status": "needs_auth", "message": dcr.message})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    if not token:
+        return JSONResponse({"status": "error", "message": "No token"}, status_code=500)
+    try:
+        result = sync_from_teams(token)
+        return JSONResponse({"status": "done", **result})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-# ── COMMENTS ───────────────────────────────────────────────────
+
+# ── ATLAS PWA JSON IMPORT ─────────────────────────────────────────
+@app.post("/import-json", response_class=HTMLResponse)
+async def import_json(request: Request, file: UploadFile = File(...)):
+    """Import a JSON export file from the Atlas FMO PWA."""
+    if not file.filename.lower().endswith(".json"):
+        return HTMLResponse('<div class="text-red-600 text-sm font-semibold">Please upload a .json file.</div>', status_code=400)
+    raw = await file.read()
+    try:
+        result = import_from_json_export(raw)
+    except ValueError as e:
+        return HTMLResponse(f'<div class="text-red-600 text-sm font-semibold">{e}</div>', status_code=400)
+    stats = get_dashboard_stats()
+    return templates.TemplateResponse(request, "components/import_result.html", {
+        "imported": result["imported"],
+        "skipped":  result["skipped"],
+        "errors":   [],
+        "observations":      get_recent_observations(),
+        "path_names":        get_all_process_path_names(),
+        "total_observations": stats["total_observations"],
+        "open_observations":  stats["open_observations"],
+        "total_paths":        stats["total_paths"],
+    })
+
+
+# ── COMMENTS ────────────────────────────────────────────
 @app.post("/observations/{obs_id}/comments", response_class=HTMLResponse)
 async def add_observation_comment(
     request: Request,

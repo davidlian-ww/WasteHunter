@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 # Microsoft Graph Explorer public client — broadly trusted, device-code capable
 _CLIENT_ID   = "de8bc8b5-d9f9-48b1-a8ad-b748da725064"
 _AUTHORITY   = "https://login.microsoftonline.com/organizations"
-_SCOPES      = ["Sites.Read.All"]
+_SCOPES      = ["Sites.Read.All", "ChannelMessage.Read.All", "Team.ReadBasic.All"]
 _TOKEN_CACHE = Path("sp_token_cache.json")
 
 # IND2 Leaders Team — confirmed owner access
@@ -207,3 +207,151 @@ def sync_from_sharepoint(token: str) -> Dict[str, int]:
         imported += 1
 
     return {"imported": imported, "skipped": skipped, "total": len(items)}
+
+
+# ── Teams Channel Sync ────────────────────────────────────────────────────────
+_TEAM_ID    = "f81296b3-afa5-4ef3-89e9-b7458bb3fa3b"
+_CHANNEL_ID = "19:0f298560d33349039762025a10b35794@thread.tacv2"
+_FMO_MARKER = "<!-- FMO_JSON:"
+_VALID_CATS = {
+    "Transportation", "Inventory", "Motion", "Waiting",
+    "Overproduction", "Over-processing", "Defects",
+}
+_VALID_SEVS = {"Low", "Medium", "High", "Critical"}
+
+
+def _ensure_teams_sync_table() -> None:
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS teams_sync (
+                msg_id  TEXT PRIMARY KEY,
+                obs_id  INTEGER NOT NULL,
+                synced_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+
+def _already_synced_teams(msg_id: str) -> bool:
+    with get_db() as conn:
+        return bool(conn.execute(
+            "SELECT 1 FROM teams_sync WHERE msg_id=?", (msg_id,)
+        ).fetchone())
+
+
+def _record_teams_sync(msg_id: str, obs_id: int) -> None:
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO teams_sync(msg_id, obs_id) VALUES(?,?)",
+            (msg_id, obs_id),
+        )
+
+
+def fetch_teams_messages(token: str) -> List[Dict[str, Any]]:
+    """Pull recent messages from the IND2 Quality Channel."""
+    url = (
+        f"https://graph.microsoft.com/v1.0/teams/{_TEAM_ID}"
+        f"/channels/{_CHANNEL_ID}/messages?$top=50"
+    )
+    r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+    r.raise_for_status()
+    return r.json().get("value", [])
+
+
+def sync_from_teams(token: str) -> Dict[str, int]:
+    """Import FMO_JSON payloads from Teams Quality Channel into SQLite."""
+    _ensure_teams_sync_table()
+    messages = fetch_teams_messages(token)
+    imported = skipped = 0
+
+    for msg in messages:
+        msg_id = msg.get("id", "")
+        body   = (msg.get("body") or {}).get("content", "")
+
+        if _already_synced_teams(msg_id):
+            skipped += 1
+            continue
+
+        # Find embedded JSON payload
+        start = body.find(_FMO_MARKER)
+        if start == -1:
+            skipped += 1
+            continue
+
+        end = body.find(" -->", start)
+        if end == -1:
+            skipped += 1
+            continue
+
+        raw = body[start + len(_FMO_MARKER):end]
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            log.warning("Bad FMO_JSON in Teams msg %s", msg_id)
+            skipped += 1
+            continue
+
+        wcat = data.get("waste_category", "")
+        sev  = data.get("severity", "Medium")
+        title = (data.get("title") or "").strip()
+
+        if not title or wcat not in _VALID_CATS:
+            skipped += 1
+            continue
+        if sev not in _VALID_SEVS:
+            sev = "Medium"
+
+        obs_id = quick_log_observation(
+            process_path    = data.get("process_path") or "Teams Import",
+            waste_category  = wcat,
+            title           = title,
+            description     = data.get("description") or "",
+            severity        = sev,
+            observed_by     = data.get("observer") or "Floor Leader",
+        )
+        _record_teams_sync(msg_id, obs_id)
+        imported += 1
+
+    return {"imported": imported, "skipped": skipped, "total": len(messages)}
+
+
+def import_from_json_export(raw_json: bytes) -> Dict[str, int]:
+    """Import a JSON export file produced by the Atlas FMO PWA."""
+    _ensure_teams_sync_table()  # reuse teams_sync table, keyed by entry id
+    try:
+        data = json.loads(raw_json)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON: {e}")
+
+    observations = data if isinstance(data, list) else data.get("observations", [])
+    imported = skipped = 0
+
+    for entry in observations:
+        entry_id = str(entry.get("id", ""))
+        wcat     = entry.get("waste_category", "")
+        sev      = entry.get("severity", "Medium")
+        title    = (entry.get("title") or "").strip()
+
+        if not title or wcat not in _VALID_CATS:
+            skipped += 1
+            continue
+
+        if entry_id and _already_synced_teams("pwa-" + entry_id):
+            skipped += 1
+            continue
+
+        if sev not in _VALID_SEVS:
+            sev = "Medium"
+
+        obs_id = quick_log_observation(
+            process_path    = entry.get("process_path") or "Atlas PWA",
+            waste_category  = wcat,
+            title           = title,
+            description     = entry.get("description") or "",
+            severity        = sev,
+            observed_by     = entry.get("observer") or "Floor Leader",
+        )
+        if entry_id:
+            _record_teams_sync("pwa-" + entry_id, obs_id)
+        imported += 1
+
+    return {"imported": imported, "skipped": skipped, "total": len(observations)}
