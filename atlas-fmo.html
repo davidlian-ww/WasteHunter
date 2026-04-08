@@ -20,14 +20,29 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden}
+  background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;
+  background-image: radial-gradient(circle at 20% 80%, rgba(0,83,226,.04) 0%, transparent 60%),
+                    radial-gradient(circle at 80% 10%, rgba(255,194,32,.06) 0%, transparent 50%);
+}
 .screen{display:none;min-height:100dvh;flex-direction:column;animation:fadeIn .2s ease}
 .screen.active{display:flex}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-/* Header */
-.hdr{background:var(--blue);color:#fff;padding:env(safe-area-inset-top,0) 20px 16px;
-  padding-top:calc(env(safe-area-inset-top,0) + 16px)}
+/* ── Fun header with curved wave bottom ── */
+.hdr{
+  background: linear-gradient(135deg, #0053e2 0%, #0033a0 60%, #1a0ea6 100%);
+  color:#fff;padding:env(safe-area-inset-top,0) 20px 0;
+  padding-top:calc(env(safe-area-inset-top,0) + 16px);
+  position:relative;
+}
+.hdr::after{
+  content:'';
+  display:block;
+  height:28px;
+  background:var(--bg);
+  border-radius:50% 50% 0 0 / 28px 28px 0 0;
+  margin:8px -4px 0;
+}
 .hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .hdr-brand{font-size:.65rem;font-weight:800;letter-spacing:.15em;opacity:.7;text-transform:uppercase}
 .hdr-badge{background:rgba(255,255,255,.18);border-radius:20px;padding:4px 10px;
@@ -121,6 +136,83 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .divider{height:1px;background:#e2e8f0;margin:16px 0}
 .row{display:flex;gap:10px}
 .row .btn{flex:1}
+/* ── Pulsing Log button ── */
+@keyframes pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(0,83,226,.5)}
+  70%{box-shadow:0 0 0 14px rgba(0,83,226,0)}
+  100%{box-shadow:0 0 0 0 rgba(0,83,226,0)}
+}
+.btn-log{
+  font-size:1.15rem;padding:22px;
+  animation:pulse-ring 2.2s ease-out infinite;
+  border-radius:20px;
+  background: linear-gradient(135deg,#0053e2,#0033a0);
+  color:#fff;
+  letter-spacing:.01em;
+}
+.btn-log:active{animation:none;transform:scale(.96)}
+
+/* ── Shift badge on home header ── */
+.shift-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.18);border-radius:20px;
+  padding:3px 10px 3px 8px;font-size:.72rem;font-weight:800;
+  letter-spacing:.05em;
+}
+
+/* ── Severity stat chips on home ── */
+.stat-strip{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.stat-chip{
+  flex:1;min-width:60px;border-radius:14px;padding:10px 8px;
+  text-align:center;font-weight:900;line-height:1.2;
+  box-shadow:0 2px 8px rgba(0,0,0,.07);
+}
+.stat-chip .chip-num{font-size:1.4rem}
+.stat-chip .chip-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;opacity:.75}
+
+/* ── Gradient category tiles ── */
+.tile{
+  padding:16px 10px;border-radius:16px;border:2px solid transparent;
+  text-align:center;cursor:pointer;transition:all .18s;
+  background:var(--tile-bg,var(--white));
+}
+.tile:active{transform:scale(.93)}
+.tile.selected{border-color:var(--tc);box-shadow:0 0 0 3px color-mix(in srgb,var(--tc) 25%,transparent)}
+.tile-icon{font-size:2rem;line-height:1;margin-bottom:6px;display:block}
+
+/* ── Upgraded obs rows ── */
+.obs-row{
+  background:var(--white);border-radius:14px;padding:12px 14px;
+  margin-bottom:8px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+  border-left:5px solid var(--obs-color,#ccc);
+}
+.obs-dot{display:none} /* replaced by border-left */
+.obs-cat-badge{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;
+}
+
+/* ── Fun identity screen header ── */
+.identity-hero{
+  font-size:3.5rem;text-align:center;margin-bottom:4px;
+  animation:bounce-in .6s cubic-bezier(.68,-0.55,.27,1.55) both;
+}
+@keyframes bounce-in{
+  0%{transform:scale(0) rotate(-15deg);opacity:0}
+  80%{transform:scale(1.1) rotate(3deg)}
+  100%{transform:scale(1) rotate(0)}
+}
+
+/* ── Sparkle on confirm ── */
+@keyframes pop-up{
+  0%{transform:translateY(20px) scale(.7);opacity:0}
+  80%{transform:translateY(-6px) scale(1.05)}
+  100%{transform:none;opacity:1}
+}
+.confirm-icon-wrap{animation:pop-up .5s cubic-bezier(.68,-0.55,.27,1.55) both}
+
 /* Install guide tabs */
 .install-tab{flex:1;padding:8px;border-radius:10px;border:2px solid #e2e8f0;
   font-size:.78rem;font-weight:800;cursor:pointer;background:var(--white);color:var(--muted)}
@@ -133,10 +225,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <div id="s-identity" class="screen active">
   <div class="hdr">
     <div class="hdr-top"><span class="hdr-brand">Walmart · NS FMO</span></div>
-    <h1>FMO Audit Tool</h1>
-    <p>Set up your profile — one time only</p>
+    <h1>📋 FMO Audit Tool</h1>
+    <p>Set up your profile — one time only 🚀</p>
   </div>
   <div class="content">
+    <div class="identity-hero">📝</div>
     <div class="card">
       <div class="section-title">👤 Your Info</div>
       <div class="field"><label>Your Name *</label>
@@ -145,9 +238,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <select id="id-site"><option value="">— Select your FC —</option></select></div>
       <div class="field"><label>Shift</label>
         <select id="id-shift">
-          <option value="AM">🌅 AM Shift</option>
-          <option value="PM">🌇 PM Shift</option>
-          <option value="Night">🌙 Night Shift</option>
+          <option value="S1">🌅 S1</option>
+          <option value="S2">☀️ S2</option>
+          <option value="S4">🌆 S4</option>
+          <option value="S5">🌙 S5</option>
         </select></div>
       <div class="field"><label>Your Process Path / Area *</label>
         <select id="id-dept"><option value="">— Select your process path —</option></select>
@@ -167,19 +261,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
       <span class="hdr-brand" id="home-site-label">Walmart · NS FMO</span>
       <span class="hdr-badge" id="home-user" onclick="show('s-identity')">👤 —</span>
     </div>
-    <h1>Audit Dashboard</h1>
-    <p id="home-shift-dept">—</p>
+    <h1 style="font-size:1.5rem">⚡ Waste Hunter</h1>
+    <p id="home-shift-dept" style="opacity:.85;font-size:.85rem">—</p>
   </div>
   <div class="content">
-    <button class="btn btn-primary" style="font-size:1.1rem;padding:20px" onclick="startObs()">
+    <button class="btn btn-log" onclick="startObs()">
       ➕ Log New Observation
     </button>
     <div class="row" style="margin-top:10px">
-      <button class="btn btn-primary btn-sm" onclick="showShare()">🔗 Share App</button>
+      <button class="btn btn-primary btn-sm" onclick="showShare()">🔗 Share</button>
       <button class="btn btn-secondary btn-sm" onclick="goDataBank()">🗄️ Data Bank</button>
-      <button class="btn btn-ghost btn-sm" onclick="show('s-webhook-setup')">⚙️ Settings</button>
+      <button class="btn btn-ghost btn-sm" style="flex:0;padding:10px 14px" onclick="show('s-webhook-setup')">⚙️</button>
     </div>
-    <div style="margin-top:20px">
+    <div id="home-stats" class="stat-strip" style="margin-top:16px"></div>
+    <div>
       <div class="section-title" id="session-count-label">This Session</div>
       <div id="session-list"><p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">
         No observations yet — tap above to log your first one.</p></div>
@@ -271,11 +366,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <!-- ── CONFIRM ── -->
 <div id="s-confirm" class="screen">
   <div class="hdr">
-    <div class="hdr-top"><span class="hdr-brand">IND2 FMO Audit</span></div>
-    <h1>Submitted!</h1><p>Observation logged successfully</p>
+    <div class="hdr-top"><span class="hdr-brand">NS FMO Audit</span></div>
+    <h1>🎉 Submitted!</h1><p>Observation logged successfully</p>
   </div>
   <div class="content center" style="padding-top:40px">
-    <span class="big-icon">✅</span>
+    <div id="confirm-icon" class="confirm-icon-wrap">
+      <span class="big-icon" style="font-size:5rem">✅</span>
+    </div>
     <div class="card">
       <p id="confirm-msg" style="font-size:.95rem;line-height:1.6;color:var(--muted)"></p>
     </div>
@@ -492,13 +589,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <script>
 // ── Constants ─────────────────────────────────────────────────────
 const CATS = [
-  {k:'Transportation', icon:'🚛', color:'#dc2626', desc:'Unnecessary material movement'},
-  {k:'Inventory',      icon:'📦', color:'#ea580c', desc:'Excess or misplaced stock'},
-  {k:'Motion',         icon:'🚶', color:'#ca8a04', desc:'Unnecessary people movement'},
-  {k:'Waiting',        icon:'⏳', color:'#0053e2', desc:'Idle time between steps'},
-  {k:'Overproduction', icon:'📈', color:'#7c3aed', desc:'More than needed or early'},
-  {k:'Over-processing',icon:'⚙️', color:'#0891b2', desc:'Unnecessary extra work'},
-  {k:'Defects',        icon:'⚠️', color:'#ea1100', desc:'Errors needing rework'},
+  {k:'Transportation', icon:'🚛', color:'#dc2626', grad:'linear-gradient(135deg,#fee2e2,#fecaca)', desc:'Unnecessary movement'},
+  {k:'Inventory',      icon:'📦', color:'#ea580c', grad:'linear-gradient(135deg,#fff7ed,#fed7aa)', desc:'Excess or misplaced stock'},
+  {k:'Motion',         icon:'🏃', color:'#ca8a04', grad:'linear-gradient(135deg,#fefce8,#fef08a)', desc:'Unnecessary people movement'},
+  {k:'Waiting',        icon:'⏳', color:'#0053e2', grad:'linear-gradient(135deg,#eff6ff,#bfdbfe)', desc:'Idle time between steps'},
+  {k:'Overproduction', icon:'📈', color:'#7c3aed', grad:'linear-gradient(135deg,#f5f3ff,#ddd6fe)', desc:'More than needed or early'},
+  {k:'Over-processing',icon:'⚙️',  color:'#0891b2', grad:'linear-gradient(135deg,#ecfeff,#a5f3fc)', desc:'Unnecessary extra work'},
+  {k:'Defects',        icon:'⚠️',  color:'#ea1100', grad:'linear-gradient(135deg,#fef2f2,#fecaca)', desc:'Errors needing rework'},
 ];
 const SEVS = [
   {k:'Low',      icon:'🟢', color:'#2a8703', bg:'#f0fdf4', desc:'Minor — note &amp; monitor'},
@@ -620,7 +717,7 @@ function loadIdentity(){
   if(id){
     document.getElementById('id-name').value  = id.name  || '';
     document.getElementById('id-site').value  = id.site  || '';
-    document.getElementById('id-shift').value = id.shift || 'AM';
+    document.getElementById('id-shift').value = id.shift || 'S1';
     document.getElementById('id-dept').value  = id.dept  || '';
     _applyIdentityToUI(id);
     goHome();
@@ -655,9 +752,9 @@ function buildCatGrid(){
   const g = document.getElementById('cat-grid');
   g.innerHTML = CATS.map(c=>`
     <div class="tile" data-cat="${c.k}" onclick="selectCat('${c.k}')"
-         style="--tc:${c.color}">
+         style="--tc:${c.color};--tile-bg:${c.grad};border-color:color-mix(in srgb,${c.color} 20%,transparent)">
       <div class="tile-icon">${c.icon}</div>
-      <div class="tile-label" style="color:${c.color}">${c.k}</div>
+      <div class="tile-label" style="color:${c.color};font-size:.8rem">${c.k}</div>
       <div class="tile-desc">${c.desc}</div>
     </div>`).join('');
 }
@@ -772,6 +869,9 @@ async function submitObs(){
     : '💾 Saved to your device. Use <strong>Export JSON</strong> on the dashboard to share with your manager.';
   document.getElementById('confirm-msg').innerHTML = msg;
   show('s-confirm');
+  // Replay bounce animation each submission
+  const ci = document.getElementById('confirm-icon');
+  ci.style.animation='none'; requestAnimationFrame(()=>ci.style.animation='');
 }
 
 async function postToTeams(entry, url){
@@ -806,27 +906,40 @@ async function postToTeams(entry, url){
   } catch{return false;}
 }
 
-// ── Session ───────────────────────────────────────────────────────
+// ── Session ────────────────────────────────────────────────
 function renderSession(){
-  const el = document.getElementById('session-list');
-  const expRow = document.getElementById('export-row');
+  const el      = document.getElementById('session-list');
+  const expRow  = document.getElementById('export-row');
+  const stats   = document.getElementById('home-stats');
   document.getElementById('session-count-label').textContent =
     `This Session (${session.length})`;
+
+  // ─ Stat chips ─
+  if(stats){
+    const sevCounts = Object.fromEntries(SEVS.map(s=>[s.k, 0]));
+    session.forEach(e=>{ if(sevCounts[e.severity]!==undefined) sevCounts[e.severity]++; });
+    stats.innerHTML = SEVS.map(s=>`
+      <div class="stat-chip" style="background:${s.bg};color:${s.color}">
+        <div class="chip-num">${sevCounts[s.k]}</div>
+        <div class="chip-lbl">${s.icon} ${s.k}</div>
+      </div>`).join('');
+  }
+
   if(!session.length){
     el.innerHTML='<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">No observations yet — tap above to log your first one.</p>';
     expRow.style.display='none'; return;
   }
   expRow.style.display='block';
   el.innerHTML = [...session].reverse().map(e=>{
-    const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️'};
+    const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️',grad:'#f1f5f9'};
     const sev = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
-    return `<div class="obs-row">
-      <div class="obs-dot" style="background:${sev.color}"></div>
+    return `<div class="obs-row" style="--obs-color:${cat.color}">
+      <div class="obs-cat-badge" style="background:${cat.grad||'#f1f5f9'}">${cat.icon}</div>
       <div class="obs-info">
         <div class="obs-title">${e.title}</div>
-        <div class="obs-meta">${cat.icon} ${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="obs-meta">${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
       </div>
-      <span style="font-size:.72rem;font-weight:700;color:${sev.color}">${e.severity}</span>
+      <span style="font-size:.72rem;font-weight:800;color:${sev.color};white-space:nowrap">${sev.icon} ${e.severity}</span>
     </div>`;
   }).join('');
 }
