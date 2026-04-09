@@ -303,33 +303,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <p id="home-shift-dept" style="opacity:.85;font-size:.85rem">—</p>
   </div>
   <div class="content">
-    <!-- ── Site picker ── -->
-    <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#0053e2;margin-bottom:8px">🏢 Select your NS site</div>
-    <div id="site-grid-wrap" style="background:#fff;border-radius:14px;padding:12px;
-         margin-bottom:14px;border:1.5px solid #bfdbfe;
-         box-shadow:0 2px 16px rgba(0,83,226,.08)">
+    <!-- ── Location card (site + observation area in one) ── -->
+    <div id="site-grid-wrap" style="background:#fff;border-radius:16px;padding:14px;
+         margin-bottom:16px;border:1.5px solid #e2e8f0;
+         box-shadow:0 2px 12px rgba(0,0,0,.06)">
+      <div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+           color:#0053e2;margin-bottom:10px">🏢 Select your site</div>
       <div id="site-tile-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px"></div>
-    </div>
-    <!-- ── Observation area selector ── -->
-    <div id="obs-path-bar" class="card card-sm" style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:1.3rem">📍</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Observing</div>
-        <div id="obs-path-label" style="font-weight:800;font-size:.9rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div>
+      <div style="border-top:1px solid #f1f5f9;margin:12px 0 10px"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:1rem;flex-shrink:0">📍</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+               color:var(--muted);margin-bottom:4px">Observation Area</div>
+          <select id="home-path-select" onchange="applyHomePicker()"
+            style="width:100%;padding:0;border:none;background:transparent;
+                   font-size:.82rem;font-weight:700;color:var(--text);
+                   font-family:inherit;outline:none;cursor:pointer">
+            <option value="">— choose process path —</option>
+          </select>
+        </div>
       </div>
-      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;padding:8px 12px;font-size:.78rem"
-              onclick="toggleHomePicker()">✏️ Change</button>
-    </div>
-    <!-- inline path picker (hidden by default) -->
-    <div id="home-path-picker" style="display:none;background:#fff;border-radius:14px;padding:14px 14px 10px;
-         margin-top:-8px;margin-bottom:14px;box-shadow:0 2px 16px rgba(0,83,226,.1);
-         border:1.5px solid #bfdbfe">
-      <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:8px">📍 Select your observation area:</div>
-      <select id="home-path-select" onchange="applyHomePicker()">
-        <option value="">— choose area —</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:auto"
-              onclick="closeHomePicker()">✕ Cancel</button>
     </div>
     <button class="btn btn-log" onclick="startObs()">
       ➕ Log New Observation
@@ -918,6 +912,9 @@ function buildHomeSiteGrid(){
       <div style="font-size:.6rem;font-weight:800;color:${sel?'#93c5fd':'#94a3b8'}">${state}</div>
     </div>`;
   }).join('');
+  // Keep path select in sync with stored value
+  const sel = document.getElementById('home-path-select');
+  if(sel) sel.value = getObsPath();
 }
 
 function pickSite(code){
@@ -946,26 +943,12 @@ function getObsPath(){
 function _setObsPath(path){
   if(!path) return;
   localStorage.setItem('fmo_obs_path', path);
-  const lbl = document.getElementById('obs-path-label');
-  if(lbl) lbl.textContent = path;
-}
-function toggleHomePicker(){
-  const picker = document.getElementById('home-path-picker');
-  const sel    = document.getElementById('home-path-select');
-  if(picker.style.display === 'none'){
-    sel.value = getObsPath();
-    picker.style.display = 'block';
-  } else {
-    picker.style.display = 'none';
-  }
-}
-function closeHomePicker(){
-  document.getElementById('home-path-picker').style.display = 'none';
+  const sel = document.getElementById('home-path-select');
+  if(sel) sel.value = path;
 }
 function applyHomePicker(){
   const sel = document.getElementById('home-path-select');
-  if(sel.value){ _setObsPath(sel.value); }
-  closeHomePicker();
+  if(sel && sel.value) _setObsPath(sel.value);
 }
 
 // ── Navigation ────────────────────────────────────────────────────
@@ -998,10 +981,11 @@ function _applyIdentityToUI(id){
   const siteLabel = siteInfo ? `${id.site} · ${siteInfo.city}` : (id.site||'NS FC');
   document.getElementById('home-site-label').textContent = `Walmart · ${siteLabel}`;
   document.getElementById('home-user').textContent = '👤 '+id.name.split(' ')[0];
-  document.getElementById('home-shift-dept').textContent = id.shift+' Shift · '+(id.dept||'— set your area below');
+  document.getElementById('home-shift-dept').textContent = id.shift+' Shift';
   if(!localStorage.getItem('fmo_obs_path') && id.dept) _setObsPath(id.dept);
-  const lbl = document.getElementById('obs-path-label');
-  if(lbl) lbl.textContent = getObsPath();
+  // Sync the inline path select to current value
+  const sel = document.getElementById('home-path-select');
+  if(sel) sel.value = getObsPath();
   buildHomeSiteGrid();
 }
 
