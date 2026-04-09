@@ -61,6 +61,16 @@
                 style="background:{{ ss.bg }};color:{{ ss.color }}">
             {{ obs.severity }}
           </span>
+          {% if obs.observation_duration_seconds %}
+          {% set dur = obs.observation_duration_seconds %}
+          {% set dur_m = (dur // 60) %}
+          {% set dur_s = (dur % 60) %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                style="background:#f0fdf4;color:#2a8703;border:1px solid #bbf7d0"
+                title="Observed for {{ dur_m }}m {{ dur_s }}s">
+            ⏱️ {% if dur_m > 0 %}{{ dur_m }}m {% endif %}{{ dur_s }}s
+          </span>
+          {% endif %}
         </div>
         <span class="text-xs text-gray-400 whitespace-nowrap">{{ obs.observed_at[:16].replace('T',' ') }}</span>
       </div>

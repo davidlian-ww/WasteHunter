@@ -217,9 +217,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .install-tab{flex:1;padding:8px;border-radius:10px;border:2px solid #e2e8f0;
   font-size:.78rem;font-weight:800;cursor:pointer;background:var(--white);color:var(--muted)}
 .install-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ── Floating Observation Timer ── */
+#obs-timer{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  display:flex;align-items:center;gap:12px;
+  background:linear-gradient(135deg,#0053e2 0%,#0033a0 100%);
+  color:#fff;border-radius:40px;padding:10px 20px;
+  box-shadow:0 6px 24px rgba(0,83,226,.45);
+  z-index:200;min-width:210px;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+#obs-timer.active{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all}
+#obs-timer.timer-paused{background:linear-gradient(135deg,#995213,#7a3f0e)}
+.timer-clock{
+  font-family:ui-monospace,monospace;font-size:1.5rem;font-weight:900;
+  letter-spacing:.02em;min-width:58px;text-align:center
+}
+.timer-status{font-size:.6rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:.12em;opacity:.8;margin-bottom:1px}
+.timer-btn{
+  background:rgba(255,255,255,.22);border:none;border-radius:20px;
+  color:#fff;padding:7px 16px;font-size:.78rem;font-weight:800;cursor:pointer;
+  white-space:nowrap;transition:background .15s
+}
+.timer-btn:active{background:rgba(255,255,255,.4)}
 </style>
 </head>
 <body>
+
+<!-- ── FLOATING OBSERVATION TIMER ── -->
+<div id="obs-timer">
+  <div>
+    <div class="timer-status" id="timer-status-lbl">⏱ Observing</div>
+    <div class="timer-clock" id="timer-clock">0:00</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:5px">
+    <button class="timer-btn" id="timer-toggle-btn" onclick="timerToggle()">⏸ Pause</button>
+    <button class="timer-btn" style="background:rgba(234,17,0,.35);font-size:.68rem;padding:4px 12px"
+            onclick="cancelObs()">✕ Cancel</button>
+  </div>
+</div>
 
 <!-- ── IDENTITY SETUP ── -->
 <div id="s-identity" class="screen active">
@@ -301,7 +339,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
   <div class="content">
     <div id="cat-grid" class="tile-grid"></div>
-    <button class="btn btn-ghost" onclick="show('s-home')">← Cancel</button>
+    <button class="btn btn-ghost" onclick="cancelObs()">← Cancel</button>
   </div>
 </div>
 
@@ -611,7 +649,68 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 </div>
 
 <script>
-// ── Constants ─────────────────────────────────────────────────────
+// ── Observation Timer ────────────────────────────────────────────────────
+let _tStart = null, _tElapsed = 0, _tInterval = null, _tRunning = false;
+
+function fmtDuration(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m + ':' + String(sec).padStart(2, '0');
+}
+function _tTick() {
+  const total = _tElapsed + Math.floor((Date.now() - _tStart) / 1000);
+  document.getElementById('timer-clock').textContent = fmtDuration(total);
+}
+function timerStart() {
+  if (_tInterval) return;
+  _tStart   = Date.now();
+  _tRunning = true;
+  _tInterval = setInterval(_tTick, 500);
+  const el = document.getElementById('obs-timer');
+  el.classList.add('active');
+  el.classList.remove('timer-paused');
+  document.getElementById('timer-toggle-btn').textContent = '⏸ Pause';
+  document.getElementById('timer-status-lbl').textContent = '⏱ Observing';
+}
+function timerToggle() {
+  if (_tRunning) {
+    // Pause
+    _tElapsed += Math.floor((Date.now() - _tStart) / 1000);
+    clearInterval(_tInterval); _tInterval = null; _tStart = null; _tRunning = false;
+    document.getElementById('obs-timer').classList.add('timer-paused');
+    document.getElementById('timer-toggle-btn').textContent = '▶ Resume';
+    document.getElementById('timer-status-lbl').textContent = '⏸ Paused';
+  } else {
+    // Resume
+    _tStart   = Date.now();
+    _tRunning = true;
+    _tInterval = setInterval(_tTick, 500);
+    document.getElementById('obs-timer').classList.remove('timer-paused');
+    document.getElementById('timer-toggle-btn').textContent = '⏸ Pause';
+    document.getElementById('timer-status-lbl').textContent = '⏱ Observing';
+  }
+}
+function timerStop() {
+  if (_tInterval) {
+    _tElapsed += Math.floor((Date.now() - _tStart) / 1000);
+    clearInterval(_tInterval); _tInterval = null;
+  }
+  _tStart = null; _tRunning = false;
+  const total = _tElapsed;
+  _tElapsed = 0; // reset for next observation
+  document.getElementById('obs-timer').classList.remove('active', 'timer-paused');
+  document.getElementById('timer-clock').textContent = '0:00';
+  return total; // seconds observed
+}
+function cancelObs() {
+  timerStop();
+  obs = {};
+  document.getElementById('det-title').value = '';
+  document.getElementById('det-desc').value  = '';
+  document.getElementById('det-path').value  = '';
+  goHome();
+}
+
+// ── Constants ────────────────────────────────────────────────────
 const CATS = [
   {k:'Transportation', icon:'🚛', color:'#dc2626', grad:'linear-gradient(135deg,#fee2e2,#fecaca)', desc:'Unnecessary movement'},
   {k:'Inventory',      icon:'📦', color:'#ea580c', grad:'linear-gradient(135deg,#fff7ed,#fed7aa)', desc:'Excess or misplaced stock'},
@@ -831,6 +930,11 @@ function buildReview(){
   const effectivePath = obs.path_override || id.dept || 'General';
   const pathNote = obs.path_override && obs.path_override !== id.dept
     ? ` <span style="font-size:.7rem;color:var(--muted)">(your area: ${id.dept})</span>` : '';
+  // Live timer reading (still running)
+  const liveSecs = _tElapsed + (_tStart ? Math.floor((Date.now()-_tStart)/1000) : 0);
+  const durRow = liveSecs > 0
+    ? `<div class="kv"><span class="kv-key">Observed For</span>
+        <span class="kv-val" style="color:#2a8703">⏱ ${fmtDuration(liveSecs)}</span></div>` : '';
   document.getElementById('review-card').innerHTML = `
     <div class="kv"><span class="kv-key">Site</span>
       <span class="kv-val">🏢 ${id.site||'—'}</span></div>
@@ -847,13 +951,16 @@ function buildReview(){
     <div class="kv"><span class="kv-key">Observer</span>
       <span class="kv-val">${id.name||'—'}</span></div>
     <div class="kv"><span class="kv-key">Shift</span>
-      <span class="kv-val">${id.shift||'—'}</span></div>`;
+      <span class="kv-val">${id.shift||'—'}</span></div>
+    ${durRow}`;
 }
 
 // ── Submit ────────────────────────────────────────────────────────
 async function submitObs(){
   const btn = document.getElementById('submit-btn');
-  btn.disabled = true; btn.textContent = '⏳ Submitting…';
+  btn.disabled = true; btn.textContent = '⧗ Submitting…';
+
+  const durationSecs = timerStop(); // capture & stop timer
 
   const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
   const effectivePath = obs.path_override || id.dept || 'General';
@@ -869,6 +976,7 @@ async function submitObs(){
     description: obs.description||'',
     severity: obs.severity,
     timestamp: new Date().toISOString(),
+    observation_duration_seconds: durationSecs || null,
   };
 
   // Save locally first (always)
@@ -888,9 +996,10 @@ async function submitObs(){
   document.getElementById('det-path').value  = '';
   btn.disabled = false; btn.textContent = '\u2705 Submit Observation';
 
+  const durNote = durationSecs > 0 ? ` Observation timed at <strong>&#9201; ${fmtDuration(durationSecs)}</strong>.` : '';
   const msg = teamsOk
-    ? '✅ Sent to Teams Quality Channel. Your manager will see it immediately.'
-    : '💾 Saved to your device. Use <strong>Export JSON</strong> on the dashboard to share with your manager.';
+    ? `✅ Sent to Teams Quality Channel. Your manager will see it immediately.${durNote}`
+    : `💾 Saved to your device. Use <strong>Export JSON</strong> on the dashboard to share with your manager.${durNote}`;
   document.getElementById('confirm-msg').innerHTML = msg;
   show('s-confirm');
   // Replay bounce animation each submission
@@ -915,6 +1024,9 @@ async function postToTeams(entry, url){
         {"name":"Area","value":entry.process_path},
         {"name":"Observer","value":entry.observer},
         {"name":"Logged","value":new Date(entry.timestamp).toLocaleString()},
+        ...(entry.observation_duration_seconds
+          ? [{"name":"Observed For","value":fmtDuration(entry.observation_duration_seconds)}]
+          : []),
       ],
       ...(entry.description?{"text":entry.description}:{})
     }],
@@ -957,11 +1069,14 @@ function renderSession(){
   el.innerHTML = [...session].reverse().map(e=>{
     const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️',grad:'#f1f5f9'};
     const sev = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
+    const durBadge = e.observation_duration_seconds
+      ? `<span style="font-size:.65rem;font-weight:800;color:#2a8703;background:#f0fdf4;
+           padding:2px 7px;border-radius:10px;margin-left:4px">⏱ ${fmtDuration(e.observation_duration_seconds)}</span>` : '';
     return `<div class="obs-row" style="--obs-color:${cat.color}">
       <div class="obs-cat-badge" style="background:${cat.grad||'#f1f5f9'}">${cat.icon}</div>
       <div class="obs-info">
         <div class="obs-title">${e.title}</div>
-        <div class="obs-meta">${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="obs-meta">${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}${durBadge}</div>
       </div>
       <span style="font-size:.72rem;font-weight:800;color:${sev.color};white-space:nowrap">${sev.icon} ${e.severity}</span>
     </div>`;
@@ -1045,7 +1160,7 @@ function renderBank(){
       <div class="obs-info">
         <div class="obs-title">${e.title}</div>
         <div class="obs-meta">${cat.icon} ${e.waste_category} &middot; ${e.process_path}</div>
-        <div class="obs-meta" style="margin-top:1px">${e.observer} &middot; ${e.site||''} &middot; ${dateStr} ${timeStr}</div>
+        <div class="obs-meta" style="margin-top:1px">${e.observer} &middot; ${e.site||''} &middot; ${dateStr} ${timeStr}${e.observation_duration_seconds?` &middot; <span style="color:#2a8703">⏱ ${fmtDuration(e.observation_duration_seconds)}</span>`:''}</div>
       </div>
       <span style="font-size:.7rem;font-weight:800;color:${sev.color};white:nowrap">${e.severity}</span>
     </div>`;
@@ -1077,6 +1192,9 @@ function openDetail(id){
       <span class="kv-val">${e.shift}</span></div>
     <div class="kv"><span class="kv-key">Logged</span>
       <span class="kv-val">${new Date(e.timestamp).toLocaleString()}</span></div>
+    ${e.observation_duration_seconds
+      ? `<div class="kv"><span class="kv-key">Observed For</span>
+          <span class="kv-val" style="color:#2a8703;font-weight:800">⏱ ${fmtDuration(e.observation_duration_seconds)}</span></div>` : ''}
     <div class="kv"><span class="kv-key">Record ID</span>
       <span class="kv-val" style="font-family:monospace;font-size:.75rem">${e.id}</span></div>`;
   document.getElementById('modal-delete-btn').onclick = () => deleteRecord(id);
@@ -1286,6 +1404,7 @@ function saveWebhook(){
 function startObs(){
   obs = {};
   buildCatGrid();
+  timerStart();
   show('s-category');
 }
 

@@ -342,13 +342,17 @@ def import_from_json_export(raw_json: bytes) -> Dict[str, int]:
         if sev not in _VALID_SEVS:
             sev = "Medium"
 
+        raw_dur = entry.get("observation_duration_seconds")
+        duration = int(raw_dur) if isinstance(raw_dur, (int, float)) and raw_dur > 0 else None
+
         obs_id = quick_log_observation(
-            process_path    = entry.get("process_path") or "Atlas PWA",
-            waste_category  = wcat,
-            title           = title,
-            description     = entry.get("description") or "",
-            severity        = sev,
-            observed_by     = entry.get("observer") or "Floor Leader",
+            process_path                 = entry.get("process_path") or "Atlas PWA",
+            waste_category               = wcat,
+            title                        = title,
+            description                  = entry.get("description") or "",
+            severity                     = sev,
+            observed_by                  = entry.get("observer") or "Floor Leader",
+            observation_duration_seconds = duration,
         )
         if entry_id:
             _record_teams_sync("pwa-" + entry_id, obs_id)

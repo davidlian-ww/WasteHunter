@@ -129,6 +129,7 @@ async def quick_log(
     severity: str = Form("Medium"),
     observed_by: str = Form("Anonymous"),
     initial_comment: str = Form(""),
+    observation_duration_seconds: Optional[int] = Form(None),
 ):
     """Create one FMO and return the refreshed feed + updated stats."""
     quick_log_observation(
@@ -139,6 +140,7 @@ async def quick_log(
         severity=severity,
         observed_by=observed_by,
         initial_comment=initial_comment,
+        observation_duration_seconds=observation_duration_seconds,
     )
     stats = get_dashboard_stats()
     return templates.TemplateResponse(request, "components/observations_feed.html", {

@@ -144,6 +144,14 @@ def init_db():
             )
         """)
         
+        # ── Migration: add observation_duration_seconds if the column is missing ──
+        try:
+            cursor.execute(
+                "ALTER TABLE waste_observations ADD COLUMN observation_duration_seconds INTEGER DEFAULT NULL"
+            )
+        except Exception:
+            pass  # Column already exists — sqlite3 raises OperationalError, not a problem
+
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_paths_site ON process_paths(site_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_steps_path ON process_steps(path_id)")
@@ -573,6 +581,7 @@ def quick_log_observation(
     severity: str = "Medium",
     observed_by: str = "Anonymous",
     initial_comment: str = "",
+    observation_duration_seconds: Optional[int] = None,
 ) -> int:
     """One-shot: create observation (+ FMA + optional comment) from a path name."""
     step_id = get_or_create_process_path(process_path)
@@ -580,9 +589,11 @@ def quick_log_observation(
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO waste_observations
-               (step_id, waste_category, title, description, severity, observed_by)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (step_id, waste_category, title, description, severity, observed_by),
+               (step_id, waste_category, title, description, severity, observed_by,
+                observation_duration_seconds)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (step_id, waste_category, title, description, severity, observed_by,
+             observation_duration_seconds),
         )
         obs_id = cursor.lastrowid
         # Auto FMA record
@@ -618,6 +629,7 @@ def get_recent_observations(limit: int = 50) -> List[Dict[str, Any]]:
             """
             SELECT wo.id, wo.title, wo.description, wo.waste_category,
                    wo.severity, wo.status, wo.observed_by, wo.observed_at,
+                   wo.observation_duration_seconds,
                    pp.name AS path_name
             FROM waste_observations wo
             JOIN process_steps ps ON wo.step_id = ps.id

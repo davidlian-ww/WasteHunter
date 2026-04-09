@@ -150,6 +150,32 @@
                     class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
         </div>
 
+        {# Observation Timer #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">⏱️ Observation Timer</label>
+          <input type="hidden" id="duration-input" name="observation_duration_seconds" value="">
+          <div class="flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
+            <div id="desk-timer-display"
+                 class="font-mono text-xl font-bold tabular-nums"
+                 style="color:#0053e2;min-width:72px">0:00</div>
+            <div class="flex gap-2 flex-1">
+              <button type="button" id="desk-timer-start"
+                      onclick="deskTimerStart()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold text-white transition-all"
+                      style="background:#0053e2">▶ Start</button>
+              <button type="button" id="desk-timer-pause"
+                      onclick="deskTimerPause()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all hidden"
+                      style="background:#ffc220;color:#1e293b">⏸ Pause</button>
+              <button type="button" id="desk-timer-reset"
+                      onclick="deskTimerReset()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style="background:#f1f5f9;color:#64748b">↺ Reset</button>
+            </div>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Start when you begin watching, stop or submit when done. Saved with the observation.</p>
+        </div>
+
         <button type="submit"
                 class="w-full py-3 rounded-lg font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95"
                 style="background:#0053e2">
@@ -183,6 +209,47 @@
 
 {% block extra_js %}
 <script>
+  /* ── Desktop Observation Stopwatch ─────────────────────────── */
+  let _deskStart = null, _deskElapsed = 0, _deskInterval = null;
+
+  function _deskFmt(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m + ':' + String(sec).padStart(2,'0');
+  }
+  function _deskTick() {
+    const total = _deskElapsed + Math.floor((Date.now() - _deskStart) / 1000);
+    document.getElementById('desk-timer-display').textContent = _deskFmt(total);
+  }
+  function deskTimerStart() {
+    if (_deskInterval) return;
+    _deskStart = Date.now();
+    _deskInterval = setInterval(_deskTick, 500);
+    document.getElementById('desk-timer-start').classList.add('hidden');
+    document.getElementById('desk-timer-pause').classList.remove('hidden');
+  }
+  function deskTimerPause() {
+    if (!_deskInterval) return;
+    _deskElapsed += Math.floor((Date.now() - _deskStart) / 1000);
+    clearInterval(_deskInterval); _deskInterval = null; _deskStart = null;
+    document.getElementById('desk-timer-pause').classList.add('hidden');
+    document.getElementById('desk-timer-start').textContent = '▶ Resume';
+    document.getElementById('desk-timer-start').classList.remove('hidden');
+  }
+  function deskTimerReset() {
+    clearInterval(_deskInterval); _deskInterval = null; _deskStart = null; _deskElapsed = 0;
+    document.getElementById('desk-timer-display').textContent = '0:00';
+    document.getElementById('duration-input').value = '';
+    document.getElementById('desk-timer-pause').classList.add('hidden');
+    const sb = document.getElementById('desk-timer-start');
+    sb.textContent = '▶ Start'; sb.classList.remove('hidden');
+  }
+  function _deskCaptureDuration() {
+    // Capture current elapsed (whether running or paused)
+    let total = _deskElapsed;
+    if (_deskInterval && _deskStart) total += Math.floor((Date.now() - _deskStart) / 1000);
+    if (total > 0) document.getElementById('duration-input').value = total;
+  }
+
   /* ── Category selector ─────────────────────────── */
   function selectCategory(btn) {
     document.querySelectorAll('.cat-btn').forEach(b => {
@@ -235,18 +302,21 @@
       b.style.background  = '#f9fafb';
     });
     selectSeverity(document.querySelector('.sev-btn[data-severity="Medium"]'));
+    deskTimerReset();
 
     const toast = document.getElementById('log-success');
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 3000);
   }
 
-  /* ── Validate category before submit ───────────── */
+  /* ── Validate category + capture duration before submit ────── */
   document.getElementById('log-form').addEventListener('submit', function(e) {
     if (!document.getElementById('waste-category-input').value) {
       e.preventDefault();
       document.getElementById('cat-error').classList.remove('hidden');
+      return;
     }
+    _deskCaptureDuration();
   });
 </script>
 {% endblock %}
