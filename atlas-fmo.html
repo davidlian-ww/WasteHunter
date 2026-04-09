@@ -313,15 +313,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     </div>
     <div id="home-stats" class="stat-strip" style="margin-top:16px"></div>
     <div>
-      <div class="section-title" id="session-count-label">This Session</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-title" style="margin-bottom:0" id="session-count-label">All Observations</div>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:.72rem;width:auto"
+                onclick="goDataBank()">Filter &amp; Search →</button>
+      </div>
       <div id="session-list"><p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">
         No observations yet — tap above to log your first one.</p></div>
     </div>
     <div id="export-row" style="display:none;margin-top:8px">
       <div class="divider"></div>
       <div class="row">
-        <button class="btn btn-secondary btn-sm" onclick="exportJSON()">📤 Export JSON</button>
-        <button class="btn btn-ghost btn-sm" onclick="clearSession()">🗑️ Clear Session</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportJSON()">📤 Export My Session</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSession()">🗑️ Clear My Session</button>
       </div>
     </div>
   </div>
@@ -357,8 +361,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <div class="card">
       <div class="field"><label>Title / Brief Description *</label>
         <input id="det-title" type="text" placeholder="e.g. Pallets blocking pick aisle"></div>
-      <div class="field"><label>Process Path (where did you see it?)</label>
-        <select id="det-path"><option value="">— Same as my area —</option></select>
+      <div class="field">
+        <label>Where did you see this?</label>
+        <!-- Locked display: shows saved area. Tap link to override. -->
+        <div id="path-locked" style="display:flex;align-items:center;gap:8px;padding:10px 14px;
+             background:#f1f5f9;border-radius:10px;border:1.5px solid #e2e8f0">
+          <span style="font-size:1.1rem">📍</span>
+          <span id="path-locked-label" style="flex:1;font-weight:600;font-size:.9rem;color:#1e293b">My Area</span>
+          <a href="#" id="path-change-link" onclick="togglePathOverride(event)"
+             style="font-size:.75rem;color:#0053e2;white-space:nowrap">Different location?</a>
+        </div>
+        <!-- Hidden override select -->
+        <select id="det-path" style="display:none;margin-top:6px">
+          <option value="">— Use my area (above) —</option>
+        </select>
       </div>
       <div class="field"><label>Details (optional)</label>
         <textarea id="det-desc" placeholder="What did you see? Impact? How often? Any ideas?"></textarea></div>
@@ -706,7 +722,11 @@ function cancelObs() {
   obs = {};
   document.getElementById('det-title').value = '';
   document.getElementById('det-desc').value  = '';
-  document.getElementById('det-path').value  = '';
+  // Reset path override to hidden/default
+  const sel  = document.getElementById('det-path');
+  const link = document.getElementById('path-change-link');
+  if(sel)  { sel.style.display = 'none'; sel.value = ''; }
+  if(link) { link.textContent = 'Different location?'; }
   goHome();
 }
 
@@ -993,7 +1013,11 @@ async function submitObs(){
   obs = {};
   document.getElementById('det-title').value = '';
   document.getElementById('det-desc').value  = '';
-  document.getElementById('det-path').value  = '';
+  // Reset path override
+  const _pSel  = document.getElementById('det-path');
+  const _pLink = document.getElementById('path-change-link');
+  if(_pSel)  { _pSel.style.display = 'none'; _pSel.value = ''; }
+  if(_pLink) { _pLink.textContent = 'Different location?'; }
   btn.disabled = false; btn.textContent = '\u2705 Submit Observation';
 
   const durNote = durationSecs > 0 ? ` Observation timed at <strong>&#9201; ${fmtDuration(durationSecs)}</strong>.` : '';
@@ -1042,18 +1066,22 @@ async function postToTeams(entry, url){
   } catch{return false;}
 }
 
-// ── Session ────────────────────────────────────────────────
+// ── Session / Home Feed ──────────────────────────────────────
 function renderSession(){
   const el      = document.getElementById('session-list');
   const expRow  = document.getElementById('export-row');
+  const label   = document.getElementById('session-count-label');
   const stats   = document.getElementById('home-stats');
-  document.getElementById('session-count-label').textContent =
-    `This Session (${session.length})`;
+  const myIds   = new Set(session.map(e=>e.id));
 
-  // ─ Stat chips ─
+  // Label: total across databank + how many are mine
+  const sessionNote = session.length ? ` · ${session.length} yours` : '';
+  if(label) label.textContent = `All Observations (${databank.length}${sessionNote})`;
+
+  // ─ Stat chips across ALL observations ─
   if(stats){
     const sevCounts = Object.fromEntries(SEVS.map(s=>[s.k, 0]));
-    session.forEach(e=>{ if(sevCounts[e.severity]!==undefined) sevCounts[e.severity]++; });
+    databank.forEach(e=>{ if(sevCounts[e.severity]!==undefined) sevCounts[e.severity]++; });
     stats.innerHTML = SEVS.map(s=>`
       <div class="stat-chip" style="background:${s.bg};color:${s.color}">
         <div class="chip-num">${sevCounts[s.k]}</div>
@@ -1061,26 +1089,39 @@ function renderSession(){
       </div>`).join('');
   }
 
-  if(!session.length){
+  if(!databank.length){
     el.innerHTML='<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0">No observations yet — tap above to log your first one.</p>';
     expRow.style.display='none'; return;
   }
-  expRow.style.display='block';
-  el.innerHTML = [...session].reverse().map(e=>{
-    const cat = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️',grad:'#f1f5f9'};
-    const sev = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
+  expRow.style.display = session.length ? 'block' : 'none';
+
+  // Newest-first, cap at 30 on home screen
+  const visible = [...databank].reverse().slice(0, 30);
+  el.innerHTML = visible.map(e=>{
+    const cat    = CATS.find(c=>c.k===e.waste_category)||{color:'#666',icon:'🗑️',grad:'#f1f5f9'};
+    const sev    = SEVS.find(s=>s.k===e.severity)||{color:'#666'};
+    const isMine = myIds.has(e.id);
+    const mineBadge = isMine
+      ? `<span style="font-size:.6rem;font-weight:800;color:#0053e2;background:#eff6ff;
+           padding:1px 6px;border-radius:8px;margin-left:5px">👤 you</span>` : '';
     const durBadge = e.observation_duration_seconds
       ? `<span style="font-size:.65rem;font-weight:800;color:#2a8703;background:#f0fdf4;
            padding:2px 7px;border-radius:10px;margin-left:4px">⏱ ${fmtDuration(e.observation_duration_seconds)}</span>` : '';
+    const observer = e.observer ? `· ${e.observer} ` : '';
     return `<div class="obs-row" style="--obs-color:${cat.color}">
       <div class="obs-cat-badge" style="background:${cat.grad||'#f1f5f9'}">${cat.icon}</div>
       <div class="obs-info">
-        <div class="obs-title">${e.title}</div>
-        <div class="obs-meta">${e.waste_category} · ${e.site||''} · ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}${durBadge}</div>
+        <div class="obs-title">${e.title}${mineBadge}</div>
+        <div class="obs-meta">${e.waste_category} ${observer}· ${new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}${durBadge}</div>
       </div>
       <span style="font-size:.72rem;font-weight:800;color:${sev.color};white-space:nowrap">${sev.icon} ${e.severity}</span>
     </div>`;
   }).join('');
+  if(databank.length > 30){
+    el.innerHTML += `<p style="text-align:center;color:var(--muted);font-size:.8rem;padding:10px 0">
+      Showing 30 of ${databank.length} — <a href="#" onclick="goDataBank();return false;"
+      style="color:var(--blue)">View all →</a></p>`;
+  }
 }
 
 function clearSession(){
@@ -1400,11 +1441,35 @@ function saveWebhook(){
   goHome();
 }
 
-// ── Misc ──────────────────────────────────────────────────────────
+// ── Misc ────────────────────────────────────────────────────
+function togglePathOverride(e){
+  e.preventDefault();
+  const sel  = document.getElementById('det-path');
+  const link = document.getElementById('path-change-link');
+  if(sel.style.display === 'none'){
+    sel.style.display = 'block';
+    link.textContent  = '✕ Use my area';
+  } else {
+    sel.style.display = 'none';
+    sel.value         = '';         // reset to “use my area”
+    link.textContent  = 'Different location?';
+  }
+}
+
 function startObs(){
   obs = {};
   buildCatGrid();
   timerStart();
+  // Pre-fill path display from identity — no more nagging 🙌
+  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
+  const myArea = id.dept || 'My Area';
+  const lbl = document.getElementById('path-locked-label');
+  if(lbl) lbl.textContent = myArea;
+  // Ensure the override select is hidden and reset
+  const sel  = document.getElementById('det-path');
+  const link = document.getElementById('path-change-link');
+  if(sel)  { sel.style.display = 'none'; sel.value = ''; }
+  if(link) { link.textContent  = 'Different location?'; }
   show('s-category');
 }
 
