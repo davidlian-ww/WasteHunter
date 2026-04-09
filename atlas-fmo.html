@@ -303,6 +303,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <p id="home-shift-dept" style="opacity:.85;font-size:.85rem">—</p>
   </div>
   <div class="content">
+    <!-- ── Observation area selector ── -->
+    <div id="obs-path-bar" class="card card-sm" style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.3rem">📍</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Observing</div>
+        <div id="obs-path-label" style="font-weight:800;font-size:.9rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;padding:8px 12px;font-size:.78rem"
+              onclick="toggleHomePicker()">✏️ Change</button>
+    </div>
+    <!-- inline path picker (hidden by default) -->
+    <div id="home-path-picker" style="display:none;background:#fff;border-radius:14px;padding:14px 14px 10px;
+         margin-top:-8px;margin-bottom:14px;box-shadow:0 2px 16px rgba(0,83,226,.1);
+         border:1.5px solid #bfdbfe">
+      <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:8px">📍 Select your observation area:</div>
+      <select id="home-path-select" onchange="applyHomePicker()">
+        <option value="">— choose area —</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:auto"
+              onclick="closeHomePicker()">✕ Cancel</button>
+    </div>
     <button class="btn btn-log" onclick="startObs()">
       ➕ Log New Observation
     </button>
@@ -335,7 +356,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <div id="s-category" class="screen">
   <div class="hdr">
     <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
-    <h1>Type of Waste</h1><p>Select the TIMWOOD category</p>
+    <h1>Spotted Waste?</h1><p id="cat-path-label">Select the TIMWOOD category — timer starts now</p>
   </div>
   <div class="steps" id="steps-cat">
     <div class="step active"></div><div class="step"></div>
@@ -361,21 +382,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <div class="card">
       <div class="field"><label>Title / Brief Description *</label>
         <input id="det-title" type="text" placeholder="e.g. Pallets blocking pick aisle"></div>
-      <div class="field">
-        <label>Where did you see this?</label>
-        <!-- Locked display: shows saved area. Tap link to override. -->
-        <div id="path-locked" style="display:flex;align-items:center;gap:8px;padding:10px 14px;
-             background:#f1f5f9;border-radius:10px;border:1.5px solid #e2e8f0">
-          <span style="font-size:1.1rem">📍</span>
-          <span id="path-locked-label" style="flex:1;font-weight:600;font-size:.9rem;color:#1e293b">My Area</span>
-          <a href="#" id="path-change-link" onclick="togglePathOverride(event)"
-             style="font-size:.75rem;color:#0053e2;white-space:nowrap">Different location?</a>
-        </div>
-        <!-- Hidden override select -->
-        <select id="det-path" style="display:none;margin-top:6px">
-          <option value="">— Use my area (above) —</option>
-        </select>
-      </div>
+
       <div class="field"><label>Details (optional)</label>
         <textarea id="det-desc" placeholder="What did you see? Impact? How often? Any ideas?"></textarea></div>
     </div>
@@ -722,11 +729,6 @@ function cancelObs() {
   obs = {};
   document.getElementById('det-title').value = '';
   document.getElementById('det-desc').value  = '';
-  // Reset path override to hidden/default
-  const sel  = document.getElementById('det-path');
-  const link = document.getElementById('path-change-link');
-  if(sel)  { sel.style.display = 'none'; sel.value = ''; }
-  if(link) { link.textContent = 'Different location?'; }
   goHome();
 }
 
@@ -833,14 +835,46 @@ function buildPathSelects(){
   const html = PROCESS_PATHS.map(g=>
     `<optgroup label="${g.g}">${g.paths.map(p=>`<option>${p}</option>`).join('')}</optgroup>`
   ).join('');
-  document.getElementById('id-dept').innerHTML  += html;
-  document.getElementById('det-path').innerHTML += html;
+  document.getElementById('id-dept').innerHTML       += html;
+  document.getElementById('home-path-select').innerHTML += html;
 }
 
 // ── State ─────────────────────────────────────────────────────
 let obs = {};
 let session  = JSON.parse(localStorage.getItem('fmo_session')||'[]');
 let databank = JSON.parse(localStorage.getItem('fmo_databank')||'[]');
+
+// ── Observation Path (session-level, persists across obs) ──────────
+/** Returns the active observation area for this session. */
+function getObsPath(){
+  return localStorage.getItem('fmo_obs_path')
+    || (JSON.parse(localStorage.getItem('fmo_identity')||'{}').dept)
+    || 'General';
+}
+function _setObsPath(path){
+  if(!path) return;
+  localStorage.setItem('fmo_obs_path', path);
+  const lbl = document.getElementById('obs-path-label');
+  if(lbl) lbl.textContent = path;
+}
+function toggleHomePicker(){
+  const picker = document.getElementById('home-path-picker');
+  const sel    = document.getElementById('home-path-select');
+  if(picker.style.display === 'none'){
+    sel.value = getObsPath();
+    picker.style.display = 'block';
+  } else {
+    picker.style.display = 'none';
+  }
+}
+function closeHomePicker(){
+  document.getElementById('home-path-picker').style.display = 'none';
+}
+function applyHomePicker(){
+  const sel = document.getElementById('home-path-select');
+  if(sel.value){ _setObsPath(sel.value); }
+  closeHomePicker();
+}
 
 // ── Navigation ────────────────────────────────────────────────────
 function show(id){
@@ -873,6 +907,11 @@ function _applyIdentityToUI(id){
   document.getElementById('home-site-label').textContent = `Walmart · ${siteLabel}`;
   document.getElementById('home-user').textContent = '👤 '+id.name.split(' ')[0];
   document.getElementById('home-shift-dept').textContent = id.shift+' Shift · '+id.dept;
+  // Seed obs path from identity if not already set by user
+  if(!localStorage.getItem('fmo_obs_path')) _setObsPath(id.dept);
+  // Always refresh the bar label (covers page reload cases)
+  const lbl = document.getElementById('obs-path-label');
+  if(lbl) lbl.textContent = getObsPath();
 }
 
 function saveIdentity(){
@@ -906,6 +945,7 @@ function selectCat(k){
   obs.category = k;
   const cat = CATS.find(c=>c.k===k);
   document.getElementById('details-cat-label').textContent = cat.icon+' '+k;
+  timerStart(); // ⏱ waste spotted — start the clock!
   show('s-details');
 }
 
@@ -915,7 +955,6 @@ function goToSeverity(){
   if(!title){alert('Please enter a brief title.'); return;}
   obs.title = title;
   obs.description = document.getElementById('det-desc').value.trim();
-  obs.path_override = document.getElementById('det-path').value; // '' means use home area
   buildSevList();
   show('s-severity');
 }
@@ -947,9 +986,7 @@ function buildReview(){
   const id   = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
   const cat  = CATS.find(c=>c.k===obs.category)||{};
   const sev  = SEVS.find(s=>s.k===obs.severity)||{};
-  const effectivePath = obs.path_override || id.dept || 'General';
-  const pathNote = obs.path_override && obs.path_override !== id.dept
-    ? ` <span style="font-size:.7rem;color:var(--muted)">(your area: ${id.dept})</span>` : '';
+  const effectivePath = getObsPath();
   // Live timer reading (still running)
   const liveSecs = _tElapsed + (_tStart ? Math.floor((Date.now()-_tStart)/1000) : 0);
   const durRow = liveSecs > 0
@@ -967,7 +1004,7 @@ function buildReview(){
     ${obs.description?`<div class="kv"><span class="kv-key">Details</span>
       <span class="kv-val" style="font-weight:400;font-size:.82rem">${obs.description}</span></div>`:''}
     <div class="kv"><span class="kv-key">Observed At</span>
-      <span class="kv-val">${effectivePath}${pathNote}</span></div>
+      <span class="kv-val">${effectivePath}</span></div>
     <div class="kv"><span class="kv-key">Observer</span>
       <span class="kv-val">${id.name||'—'}</span></div>
     <div class="kv"><span class="kv-key">Shift</span>
@@ -983,7 +1020,7 @@ async function submitObs(){
   const durationSecs = timerStop(); // capture & stop timer
 
   const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
-  const effectivePath = obs.path_override || id.dept || 'General';
+  const effectivePath = getObsPath();
   const entry = {
     id: Date.now(),
     observer: id.name||'Anonymous',
@@ -1013,11 +1050,6 @@ async function submitObs(){
   obs = {};
   document.getElementById('det-title').value = '';
   document.getElementById('det-desc').value  = '';
-  // Reset path override
-  const _pSel  = document.getElementById('det-path');
-  const _pLink = document.getElementById('path-change-link');
-  if(_pSel)  { _pSel.style.display = 'none'; _pSel.value = ''; }
-  if(_pLink) { _pLink.textContent = 'Different location?'; }
   btn.disabled = false; btn.textContent = '\u2705 Submit Observation';
 
   const durNote = durationSecs > 0 ? ` Observation timed at <strong>&#9201; ${fmtDuration(durationSecs)}</strong>.` : '';
@@ -1441,35 +1473,14 @@ function saveWebhook(){
   goHome();
 }
 
-// ── Misc ────────────────────────────────────────────────────
-function togglePathOverride(e){
-  e.preventDefault();
-  const sel  = document.getElementById('det-path');
-  const link = document.getElementById('path-change-link');
-  if(sel.style.display === 'none'){
-    sel.style.display = 'block';
-    link.textContent  = '✕ Use my area';
-  } else {
-    sel.style.display = 'none';
-    sel.value         = '';         // reset to “use my area”
-    link.textContent  = 'Different location?';
-  }
-}
+// ── Misc ────────────────────────────────────────
 
 function startObs(){
   obs = {};
   buildCatGrid();
-  timerStart();
-  // Pre-fill path display from identity — no more nagging 🙌
-  const id = JSON.parse(localStorage.getItem('fmo_identity')||'{}');
-  const myArea = id.dept || 'My Area';
-  const lbl = document.getElementById('path-locked-label');
-  if(lbl) lbl.textContent = myArea;
-  // Ensure the override select is hidden and reset
-  const sel  = document.getElementById('det-path');
-  const link = document.getElementById('path-change-link');
-  if(sel)  { sel.style.display = 'none'; sel.value = ''; }
-  if(link) { link.textContent  = 'Different location?'; }
+  // Show which area we're watching — NO timer yet
+  const catLbl = document.getElementById('cat-path-label');
+  if(catLbl) catLbl.textContent = `📍 ${getObsPath()} · tap a type when you spot waste`;
   show('s-category');
 }
 
