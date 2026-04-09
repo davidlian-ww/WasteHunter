@@ -329,7 +329,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     </button>
     <div class="row" style="margin-top:10px">
       <button class="btn btn-primary btn-sm" onclick="showShare()">🔗 Share</button>
-      <button class="btn btn-secondary btn-sm" onclick="goDataBank()">🗄️ Data Bank</button>
+      <button class="btn" style="background:#0891b2;color:#fff;font-size:.78rem;font-weight:700;padding:10px 14px;border-radius:12px;flex:0;white-space:nowrap" onclick="goHub()">🏢 Site Hub</button>
+      <button class="btn btn-secondary btn-sm" onclick="goDataBank()">🗿 Data Bank</button>
       <button class="btn btn-ghost btn-sm" style="flex:0;padding:10px 14px" onclick="show('s-webhook-setup')">⚙️</button>
     </div>
     <div id="home-stats" class="stat-strip" style="margin-top:16px"></div>
@@ -477,6 +478,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
           <option>High</option><option>Critical</option>
         </select>
       </div>
+      <div class="row" style="margin-top:6px;gap:6px">
+        <select id="db-filter-site" onchange="renderBank()"
+          style="flex:1;padding:8px;border:2px solid #e2e8f0;border-radius:10px;
+                 font-size:.78rem;font-family:inherit;outline:none">
+          <option value="">All Sites</option>
+        </select>
+      </div>
     </div>
     <!-- summary chips -->
     <div id="db-chips" class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
@@ -496,6 +504,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportBank()">📤 Export All</button>
     <button class="btn btn-ghost btn-sm" style="color:var(--red);flex:1" onclick="clearBank()">🗑️ Clear All</button>
     <button class="btn btn-ghost btn-sm" style="flex:1" onclick="goHome()">&#8592; Home</button>
+  </div>
+</div>
+
+<!-- ── MASTER SITE HUB ── -->
+<div id="s-hub" class="screen">
+  <div class="hdr" style="background:linear-gradient(135deg,#0891b2 0%,#0053e2 100%)">
+    <div class="hdr-top">
+      <span class="hdr-brand">NS Manual Atlas · All Sites</span>
+      <span class="hdr-badge" id="hub-total-badge">0 obs</span>
+    </div>
+    <h1>🏢 Master Hub</h1>
+    <p id="hub-subtitle" style="opacity:.85;font-size:.82rem">Waste audit data across all NS FC sites</p>
+  </div>
+  <div class="content" style="padding-bottom:80px">
+    <!-- global summary strip -->
+    <div id="hub-summary" class="stat-strip" style="margin-bottom:16px"></div>
+    <!-- executive insight bar -->
+    <div id="hub-insight" style="display:none;background:linear-gradient(135deg,#eff6ff,#f0fdf4);
+         border-radius:14px;padding:14px 16px;margin-bottom:16px;border:1.5px solid #bfdbfe">
+      <div style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#0053e2;margin-bottom:4px">💡 Insight</div>
+      <div id="hub-insight-text" style="font-size:.85rem;font-weight:600;color:#1e293b;line-height:1.5"></div>
+    </div>
+    <!-- per-site cards -->
+    <div id="hub-sites"></div>
+    <!-- empty state -->
+    <div id="hub-empty" style="display:none;text-align:center;padding:60px 0;color:var(--muted)">
+      <div style="font-size:3rem;margin-bottom:12px">🏢</div>
+      <p style="font-weight:800;font-size:1rem">No site data yet</p>
+      <p style="font-size:.85rem;margin-top:6px">Import JSON files from your team to see all sites here.</p>
+      <button class="btn btn-primary btn-sm" style="margin-top:20px;width:auto;padding:10px 20px"
+              onclick="show('s-share')">Import &amp; Share →</button>
+    </div>
+  </div>
+  <div style="position:fixed;bottom:0;left:0;right:0;background:var(--white);
+              border-top:1px solid #e2e8f0;padding:12px 20px;
+              display:flex;gap:10px;max-width:500px;margin:0 auto">
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="goDataBank()">🗿 Full Data Bank</button>
+    <button class="btn btn-ghost btn-sm" style="flex:1" onclick="goHome()">← Home</button>
   </div>
 </div>
 
@@ -1176,22 +1222,171 @@ function exportJSON(){
       'application/json');
 }
 
-// ── Data Bank ────────────────────────────────────────────────
-function goDataBank(){
+// ── Data Bank ────────────────────────────────────────────
+function goDataBank(filterSite){
+  // Optionally pre-filter to a site (called from Site Hub cards)
+  if(filterSite){
+    const sel = document.getElementById('db-filter-site');
+    if(sel) sel.value = filterSite;
+  }
   renderBank();
   show('s-databank');
 }
 
+// ── Master Site Hub ────────────────────────────────────────
+const SEV_META = {
+  Critical: {color:'#dc2626', icon:'🔴'},
+  High:     {color:'#f97316', icon:'🟠'},
+  Medium:   {color:'#eab308', icon:'🟡'},
+  Low:      {color:'#22c55e', icon:'🟢'},
+};
+
+function goHub(){
+  renderHub();
+  show('s-hub');
+}
+
+function renderHub(){
+  const total = databank.length;
+  document.getElementById('hub-total-badge').textContent = total + (total===1?' obs':' obs');
+
+  // ── Global summary strip
+  const sevCounts = {Critical:0, High:0, Medium:0, Low:0};
+  const catCounts = {};
+  databank.forEach(e=>{
+    if(e.severity && sevCounts[e.severity] !== undefined) sevCounts[e.severity]++;
+    if(e.waste_category) catCounts[e.waste_category] = (catCounts[e.waste_category]||0)+1;
+  });
+  const topCat = Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
+  const topCatInfo = topCat ? CATS.find(c=>c.k===topCat[0]) : null;
+  document.getElementById('hub-summary').innerHTML =
+    `<div class="stat-chip" style="--chip-c:#0053e2">📄 ${total} Total</div>`+
+    Object.entries(sevCounts).filter(([,v])=>v>0).map(([k,v])=>
+      `<div class="stat-chip" style="--chip-c:${SEV_META[k].color}">${SEV_META[k].icon} ${v} ${k}</div>`
+    ).join('')+
+    (topCatInfo?`<div class="stat-chip" style="--chip-c:#7c3aed">${topCatInfo.icon} ${topCatInfo.k}</div>`:'' );
+
+  // ── Executive insight
+  const insightEl = document.getElementById('hub-insight');
+  const insightTxt = document.getElementById('hub-insight-text');
+  if(total > 0 && topCat){
+    const sitesWithData = [...new Set(databank.map(e=>e.site).filter(Boolean))];
+    const critPct = total ? Math.round(sevCounts.Critical*100/total) : 0;
+    const insights = [];
+    if(sitesWithData.length === 1) insights.push(`All ${total} observations are from <strong>${sitesWithData[0]}</strong> — import more sites to compare.`);
+    else insights.push(`<strong>${sitesWithData.length} sites</strong> active across NS Manual Atlas.`);
+    if(critPct >= 20) insights.push(`⚠️ <strong>${critPct}%</strong> of observations are Critical — needs immediate attention.`);
+    if(topCatInfo) insights.push(`<strong>${topCatInfo.icon} ${topCatInfo.k}</strong> is the #1 waste type (${topCat[1]} obs).`);
+    insightTxt.innerHTML = insights.join(' ');
+    insightEl.style.display = 'block';
+  } else {
+    insightEl.style.display = 'none';
+  }
+
+  // ── Per-site cards (sorted by obs count desc)
+  const bysite = {};
+  databank.forEach(e=>{
+    const s = e.site || 'Unknown';
+    if(!bysite[s]) bysite[s] = [];
+    bysite[s].push(e);
+  });
+  const hub = document.getElementById('hub-sites');
+  const emp = document.getElementById('hub-empty');
+  const siteCodes = Object.keys(bysite).sort((a,b)=>bysite[b].length-bysite[a].length);
+  if(!siteCodes.length){ hub.innerHTML=''; emp.style.display='block'; return; }
+  emp.style.display = 'none';
+
+  hub.innerHTML = siteCodes.map(sCode=>{
+    const obs    = bysite[sCode];
+    const info   = NS_SITES.find(x=>x.code===sCode);
+    const n      = obs.length;
+    // severity breakdown
+    const sev = {Critical:0, High:0, Medium:0, Low:0};
+    const cat = {};
+    const paths = {};
+    obs.forEach(e=>{
+      if(e.severity && sev[e.severity]!==undefined) sev[e.severity]++;
+      if(e.waste_category) cat[e.waste_category]  = (cat[e.waste_category] ||0)+1;
+      if(e.process_path)   paths[e.process_path]  = (paths[e.process_path] ||0)+1;
+    });
+    // top 3 waste categories with bar
+    const topCats = Object.entries(cat).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const catBars = topCats.map(([k,v])=>{
+      const ci  = CATS.find(c=>c.k===k)||{icon:'',color:'#64748b'};
+      const pct = Math.round(v*100/n);
+      return `<div style="margin-bottom:5px">
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;font-weight:700;margin-bottom:2px">
+          <span>${ci.icon} ${k}</span><span style="color:var(--muted)">${v}</span></div>
+        <div style="background:#f1f5f9;border-radius:99px;height:5px">
+          <div style="height:5px;border-radius:99px;background:${ci.color};width:${pct}%"></div></div></div>`;
+    }).join('');
+    // top process path hotspot
+    const topPath = Object.entries(paths).sort((a,b)=>b[1]-a[1])[0];
+    const hotspot = topPath ? `<div style="font-size:.7rem;color:#0053e2;font-weight:700;margin-top:8px">🔥 Hotspot: ${topPath[0]} (${topPath[1]})</div>` : '';
+    // severity chips
+    const sevChips = Object.entries(sev).filter(([,v])=>v>0).map(([k,v])=>
+      `<span style="background:${SEV_META[k].color}18;color:${SEV_META[k].color};
+        padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:800
+        ">${SEV_META[k].icon} ${v}</span>`
+    ).join(' ');
+    // recent 3
+    const recent = [...obs].sort((a,b)=>b.id-a.id).slice(0,3);
+    const recentRows = recent.map(e=>{
+      const sc = SEV_META[e.severity]||{color:'#64748b',icon:'●'};
+      const ts = new Date(e.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;
+               border-bottom:1px solid #f1f5f9">
+        <span style="font-size:.75rem;color:${sc.color};flex-shrink:0">${sc.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.78rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.title||'(untitled)'}</div>
+          <div style="font-size:.65rem;color:var(--muted)">${e.process_path||'—'} · ${ts}</div>
+        </div></div>`;
+    }).join('');
+
+    return `<div class="card" style="margin-bottom:14px">
+      <!-- site header -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;
+             padding:8px 12px;text-align:center;min-width:52px">
+          <div style="font-size:.95rem;font-weight:900;color:#0053e2">${sCode}</div>
+          <div style="font-size:.55rem;font-weight:700;color:#0053e2;opacity:.7;letter-spacing:.05em">NS FC</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:.9rem">${info?info.city:sCode}</div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:2px">${sevChips}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:1.4rem;font-weight:900;color:#0053e2">${n}</div>
+          <div style="font-size:.6rem;color:var(--muted);font-weight:700">obs</div>
+        </div>
+      </div>
+      <!-- TIMWOOD bars -->
+      ${topCats.length ? `<div style="margin-bottom:4px">${catBars}</div>` : ''}
+      ${hotspot}
+      <!-- recent obs -->
+      ${recentRows ? `<div style="margin-top:10px">
+        <div style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Recent</div>
+        ${recentRows}</div>` : ''}
+      <!-- drill-down link -->
+      <button class="btn btn-secondary btn-sm"
+        style="margin-top:12px;width:100%;font-size:.75rem"
+        onclick="goDataBank('${sCode}')">See all ${n} records at ${sCode} →</button>
+    </div>`;
+  }).join('');
+}
+
 function filteredBank(){
-  const q   = (document.getElementById('db-search').value||'').toLowerCase();
-  const cat = document.getElementById('db-filter-cat').value;
-  const sev = document.getElementById('db-filter-sev').value;
+  const q    = (document.getElementById('db-search').value||'').toLowerCase();
+  const cat  = document.getElementById('db-filter-cat').value;
+  const sev  = document.getElementById('db-filter-sev').value;
+  const site = document.getElementById('db-filter-site').value;
   return [...databank].reverse().filter(e=>{
-    if(cat && e.waste_category !== cat) return false;
-    if(sev && e.severity !== sev) return false;
+    if(cat  && e.waste_category !== cat)  return false;
+    if(sev  && e.severity       !== sev)  return false;
+    if(site && e.site           !== site) return false;
     if(q && ![
       e.title, e.waste_category, e.process_path,
-      e.observer, e.description
+      e.observer, e.description, e.site
     ].join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1201,6 +1396,18 @@ function renderBank(){
   const records = filteredBank();
   document.getElementById('db-count-badge').textContent =
     databank.length + (databank.length===1?' record':' records');
+
+  // Populate site filter dynamically from actual data
+  const siteSel = document.getElementById('db-filter-site');
+  if(siteSel){
+    const cur = siteSel.value;
+    const sitesInData = [...new Set(databank.map(e=>e.site).filter(Boolean))].sort();
+    siteSel.innerHTML = '<option value="">All Sites</option>' +
+      sitesInData.map(s=>{
+        const info = NS_SITES.find(x=>x.code===s);
+        return `<option value="${s}"${cur===s?' selected':''}>${s}${info?' · '+info.city:''}</option>`;
+      }).join('');
+  }
 
   // Summary chips
   const chips = document.getElementById('db-chips');
