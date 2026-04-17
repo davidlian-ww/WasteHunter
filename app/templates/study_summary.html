@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}Study Summary — {{ session.path_name }}{% endblock %}
+
+{% block content %}
+{% set wall_m   = session.total_wall_seconds  // 60 if session.total_wall_seconds  else 0 %}
+{% set wall_s   = session.total_wall_seconds  %  60 if session.total_wall_seconds  else 0 %}
+{% set waste_m  = session.total_waste_seconds // 60 if session.total_waste_seconds else 0 %}
+{% set waste_s  = session.total_waste_seconds %  60 if session.total_waste_seconds else 0 %}
+{% set waste_pct = ((session.total_waste_seconds / session.total_wall_seconds) * 100) | round(1)
+                   if session.total_wall_seconds and session.total_wall_seconds > 0 else 0 %}
+
+{% set cat_styles = {
+  'Transportation': {'icon':'🚛','color':'#dc2626','bg':'#fef2f2'},
+  'Inventory':      {'icon':'📦','color':'#ea580c','bg':'#fff7ed'},
+  'Motion':         {'icon':'🏃','color':'#ca8a04','bg':'#fefce8'},
+  'Waiting':        {'icon':'⏳','color':'#0053e2','bg':'#eff6ff'},
+  'Overproduction': {'icon':'📈','color':'#7c3aed','bg':'#f5f3ff'},
+  'Over-processing':{'icon':'⚙️','color':'#0891b2','bg':'#ecfeff'},
+  'Defects':        {'icon':'❌','color':'#dc2626','bg':'#fff1f2'},
+  'Safety':         {'icon':'🦺','color':'#2a8703','bg':'#f0fdf4'},
+} %}
+{% set sev_colors = {
+  'Critical':'#ea1100','High':'#ea580c','Medium':'#ca8a04','Low':'#2a8703'
+} %}
+
+{# ── Header ── #}
+<div class="rounded-xl overflow-hidden mb-5 shadow-sm"
+     style="background:linear-gradient(135deg,#2a8703,#1f6602)">
+  <div class="px-6 py-5 text-white">
+    <div class="text-xs font-semibold uppercase tracking-widest opacity-70 mb-1">✅ Study Complete</div>
+    <h1 class="text-3xl font-bold">{{ session.path_name }}</h1>
+    <div class="text-sm opacity-80 mt-1">
+      🏭 {{ session.site_name or 'FC' }} &nbsp;·&nbsp;
+      👤 {{ session.observer }} &nbsp;·&nbsp;
+      📅 {{ session.started_at[:10] if session.started_at else '—' }}
+    </div>
+  </div>
+</div>
+
+{# ── KPI row ── #}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
+    <div class="text-3xl font-bold text-gray-900 font-mono tabular-nums">{{ wall_m }}m {{ wall_s }}s</div>
+    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">⏱️ Total Study Time</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
+    <div class="text-3xl font-bold font-mono tabular-nums" style="color:#ea1100">
+      {{ waste_m }}m {{ waste_s }}s
+    </div>
+    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">🗑️ Total Waste Time</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
+    <div class="text-3xl font-bold font-mono tabular-nums"
+         style="color:{{ '#2a8703' if waste_pct < 20 else ('#ca8a04' if waste_pct < 40 else '#ea1100') }}">
+      {{ waste_pct }}%
+    </div>
+    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">📊 % Time Wasted</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
+    <div class="text-3xl font-bold text-gray-900">{{ session.fmo_count }}</div>
+    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">📋 FMOs Observed</div>
+  </div>
+</div>
+
+{# ── Executive Insight ── #}
+{% if session.fmo_count > 0 %}
+<div class="rounded-xl p-4 mb-5 border" style="background:#fffbeb;border-color:#ffc220">
+  <div class="font-bold text-gray-800 mb-1">🧠 Executive Insight</div>
+  <p class="text-sm text-gray-700">
+    During this study of <strong>{{ session.path_name }}</strong>,
+    <strong>{{ waste_pct }}%</strong> of total walk time
+    ({{ waste_m }}m {{ waste_s }}s out of {{ wall_m }}m {{ wall_s }}s)
+    was spent observing documented waste.
+    {{ session.fmo_count }} failure mode observation{{ 's' if session.fmo_count != 1 else '' }}
+    {{ 'were' if session.fmo_count != 1 else 'was' }} captured —
+    each one an improvement opportunity for this process path.
+    {% if sorted_cats %}
+    The biggest time sink was
+    <strong>{{ sorted_cats[0][0] }}</strong>
+    at {{ sorted_cats[0][1].secs // 60 }}m {{ sorted_cats[0][1].secs % 60 }}s.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+
+{# ── Time Wasted per Category — Chart ── #}
+{% if sorted_cats %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-5">
+  <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+    <h2 class="font-bold text-gray-800">⏱️ Time Wasted per Category</h2>
+    <span class="text-xs text-gray-400">seconds observed per TIMWOOD pillar</span>
+  </div>
+  <div class="p-5">
+    <div style="position:relative;height:{{ [sorted_cats|length * 52, 140] | max }}px">
+      <canvas id="cat-chart"></canvas>
+    </div>
+  </div>
+</div>
+
+{# ── Category breakdown (progress bars) + FMO list ── #}
+<div class="grid grid-cols-5 gap-5">
+
+  {# Left — category progress list #}
+  <div class="col-span-2">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-bold text-gray-800">🗂️ Waste Breakdown</h2>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for cat, vals in sorted_cats %}
+        {% set cs = cat_styles.get(cat, {'icon':'🗑️','color':'#6b7280','bg':'#f9fafb'}) %}
+        {% set pct = ((vals.secs / total_waste) * 100) | round(1) if total_waste > 0 else 0 %}
+        <div class="px-5 py-3">
+          <div class="flex items-center gap-2 mb-1.5">
+            <div class="w-7 h-7 rounded-md flex items-center justify-center text-sm flex-shrink-0"
+                 style="background:{{ cs.bg }}">{{ cs.icon }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-semibold text-gray-800 truncate">{{ cat }}</span>
+                <span class="text-xs font-bold flex-shrink-0"
+                      style="color:{{ cs.color }}">
+                  {{ vals.count }} FMO{{ 's' if vals.count != 1 else '' }}
+                </span>
+              </div>
+            </div>
+          </div>
+          {# Progress bar #}
+          <div class="flex items-center gap-2">
+            <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div class="h-2.5 rounded-full transition-all"
+                   style="width:{{ pct }}%;background:{{ cs.color }}"></div>
+            </div>
+            <div class="text-xs tabular-nums font-mono text-gray-600 flex-shrink-0 w-20 text-right">
+              {{ vals.secs // 60 }}m {{ '%02d' % (vals.secs % 60) }}s
+              <span class="text-gray-400">({{ pct }}%)</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# Right — full FMO list #}
+  <div class="col-span-3">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-bold text-gray-800">📋 All FMOs Logged</h2>
+      </div>
+      {% if observations %}
+      <div class="divide-y divide-gray-50 overflow-y-auto" style="max-height:520px">
+        {% for obs in observations %}
+        {% set cs = cat_styles.get(obs.waste_category, {'icon':'🗑️','color':'#6b7280','bg':'#f9fafb'}) %}
+        {% set sc = sev_colors.get(obs.severity, '#6b7280') %}
+        <div class="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+               style="background:{{ cs.bg }}">{{ cs.icon }}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-sm text-gray-900">{{ obs.title }}</span>
+              <span class="text-xs font-bold px-1.5 py-0.5 rounded"
+                    style="background:{{ cs.bg }};color:{{ cs.color }}">{{ obs.waste_category }}</span>
+              <span class="text-xs font-bold" style="color:{{ sc }}">{{ obs.severity }}</span>
+            </div>
+            {% if obs.observation_duration_seconds %}
+            <div class="text-xs text-gray-400 mt-0.5">
+              ⏱️ {{ obs.observation_duration_seconds // 60 }}m
+              {{ '%02d' % (obs.observation_duration_seconds % 60) }}s observed
+            </div>
+            {% else %}
+            <div class="text-xs text-gray-300 mt-0.5">No timer recorded</div>
+            {% endif %}
+          </div>
+          <div class="text-xs text-gray-400 whitespace-nowrap">
+            {{ obs.observed_at[11:16] if obs.observed_at else '' }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="py-12 text-center text-gray-400 text-sm">No FMOs were logged.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% else %}
+{# No observations at all #}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 py-16 text-center text-gray-400">
+  <div class="text-5xl mb-3">📋</div>
+  <p class="text-sm">No FMOs were logged during this study.</p>
+</div>
+{% endif %}
+
+{# ── Action row ── #}
+<div class="flex gap-3 mt-5">
+  <a href="/paths"
+     class="px-5 py-2.5 rounded-lg font-semibold text-sm border border-gray-300 hover:bg-gray-50 transition">
+    ← Back to Paths
+  </a>
+  <a href="/"
+     class="px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition hover:opacity-90"
+     style="background:#0053e2">
+    📋 FMO Dashboard
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if sorted_cats %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const raw = {{ cat_chart_json | safe }};
+
+  // Convert seconds → "Xm Ys" labels on x-axis
+  function fmtSecs(s) {
+    if (s === 0) return '0s';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? m + 'm ' + String(sec).padStart(2,'0') + 's' : sec + 's';
+  }
+
+  new Chart(document.getElementById('cat-chart'), {
+    type: 'bar',
+    data: {
+      labels: raw.labels,
+      datasets: [{
+        label: 'Time Observed (seconds)',
+        data:  raw.times,
+        backgroundColor: raw.colors.map(c => c + 'cc'),
+        borderColor:     raw.colors,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',          // horizontal bars
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const secs  = ctx.parsed.x;
+              const count = raw.counts[ctx.dataIndex];
+              return [
+                '  ⏱️ ' + fmtSecs(secs) + ' observed',
+                '  📋 ' + count + ' FMO' + (count !== 1 ? 's' : ''),
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: {
+            callback: v => fmtSecs(v),
+            font: { family: 'monospace', size: 11 },
+          }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { font: { size: 12, weight: '600' } }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

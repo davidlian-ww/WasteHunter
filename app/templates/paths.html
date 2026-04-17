@@ -51,10 +51,17 @@
                             <span>📅 {{ path.created_at[:10] }}</span>
                         </div>
                     </div>
-                    <a href="/paths/{{ path.id }}" 
-                       class="ml-4 bg-walmart-blue hover:bg-walmart-blue-hover text-white px-6 py-2 rounded-lg font-semibold transition whitespace-nowrap">
-                        View Details →
-                    </a>
+                    <div class="ml-4 flex gap-2">
+                      <button
+                          onclick="openStartStudy({{ path.id }}, '{{ path.name | replace("'", "\\'") }}', '{{ path.site_name | replace("'", "\\'") }}')"
+                          class="bg-[#2a8703] hover:bg-green-800 text-white px-5 py-2 rounded-lg font-semibold transition whitespace-nowrap text-sm">
+                          🔬 Start Study
+                      </button>
+                      <a href="/paths/{{ path.id }}"
+                         class="bg-walmart-blue hover:bg-walmart-blue-hover text-white px-5 py-2 rounded-lg font-semibold transition whitespace-nowrap text-sm">
+                          View Details →
+                      </a>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -158,4 +165,71 @@
         </div>
     </div>
 </div>
+
+{# ── Start Study Modal ── #}
+<div id="startStudyModal"
+     class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+    <div class="px-6 py-5 rounded-t-xl"
+         style="background:linear-gradient(135deg,#0053e2,#003db5)">
+      <div class="flex justify-between items-start">
+        <div>
+          <h2 class="text-xl font-bold text-white">🔬 Start FMO Study</h2>
+          <p id="ss-path-label" class="text-blue-200 text-sm mt-0.5 font-medium"></p>
+        </div>
+        <button onclick="document.getElementById('startStudyModal').classList.add('hidden')"
+                class="text-blue-200 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <form method="post" action="/study/start" class="p-6 space-y-4">
+      <input type="hidden" id="ss-path-id"   name="path_id">
+      <input type="hidden" id="ss-path-name" name="path_name">
+      <input type="hidden" id="ss-site-name" name="site_name">
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+          Your Name
+        </label>
+        <input id="ss-observer" name="observer" placeholder="e.g. David Lian"
+               class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
+                      focus:outline-none focus:ring-2"
+               style="--tw-ring-color:#0053e2">
+        <p class="text-xs text-gray-400 mt-1">
+          Identifies you as the observer in the study report.
+        </p>
+      </div>
+      <div class="pt-2 flex gap-3">
+        <button type="submit"
+                class="flex-1 py-2.5 rounded-lg font-bold text-white text-sm
+                       transition hover:opacity-90 active:scale-95"
+                style="background:#2a8703">
+          🚀 Start Study
+        </button>
+        <button type="button"
+                onclick="document.getElementById('startStudyModal').classList.add('hidden')"
+                class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm
+                       font-semibold hover:bg-gray-50 transition">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openStartStudy(pathId, pathName, siteName) {
+  document.getElementById('ss-path-id').value   = pathId;
+  document.getElementById('ss-path-name').value  = pathName;
+  document.getElementById('ss-site-name').value  = siteName;
+  document.getElementById('ss-path-label').textContent = pathName;
+  document.getElementById('startStudyModal').classList.remove('hidden');
+  document.getElementById('ss-observer').focus();
+}
+</script>
 {% endblock %}

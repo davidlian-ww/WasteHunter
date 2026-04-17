@@ -1,0 +1,60 @@
+{# Study observation list — returned by HTMX after each FMO log #}
+{% set cat_styles = {
+  'Transportation': {'icon':'🚛','color':'#dc2626','bg':'#fef2f2'},
+  'Inventory':      {'icon':'📦','color':'#ea580c','bg':'#fff7ed'},
+  'Motion':         {'icon':'🏃','color':'#ca8a04','bg':'#fefce8'},
+  'Waiting':        {'icon':'⏳','color':'#0053e2','bg':'#eff6ff'},
+  'Overproduction': {'icon':'📈','color':'#7c3aed','bg':'#f5f3ff'},
+  'Over-processing':{'icon':'⚙️','color':'#0891b2','bg':'#ecfeff'},
+  'Defects':        {'icon':'❌','color':'#dc2626','bg':'#fff1f2'},
+  'Safety':         {'icon':'🦺','color':'#2a8703','bg':'#f0fdf4'},
+} %}
+{% set sev_colors = {
+  'Critical': '#ea1100', 'High': '#ea580c', 'Medium': '#ca8a04', 'Low': '#2a8703'
+} %}
+
+{# Stats bar #}
+<div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100 rounded-t-xl">
+  <span class="text-sm font-semibold text-gray-700">
+    📋 {{ observations | length }} FMO{{ 's' if observations | length != 1 else '' }} logged
+  </span>
+  <span class="text-sm font-semibold" style="color:#0053e2">
+    ⏱️ {{ (total_waste_seconds // 60) }}m {{ (total_waste_seconds % 60) }}s total waste time
+  </span>
+</div>
+
+{% if observations %}
+<div class="divide-y divide-gray-50 overflow-y-auto" style="max-height:520px">
+  {% for obs in observations %}
+  {% set cs = cat_styles.get(obs.waste_category, {'icon':'🗑️','color':'#6b7280','bg':'#f9fafb'}) %}
+  {% set sc = sev_colors.get(obs.severity, '#6b7280') %}
+  <div class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition">
+    <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+         style="background:{{ cs.bg }}">{{ cs.icon }}</div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-semibold text-sm text-gray-900 truncate">{{ obs.title }}</span>
+        <span class="text-xs font-bold px-1.5 py-0.5 rounded"
+              style="background:{{ cs.bg }};color:{{ cs.color }}">
+          {{ obs.waste_category }}
+        </span>
+        <span class="text-xs font-bold" style="color:{{ sc }}">{{ obs.severity }}</span>
+      </div>
+      {% if obs.observation_duration_seconds %}
+      <div class="text-xs text-gray-400 mt-0.5">
+        ⏱️ {{ (obs.observation_duration_seconds // 60) }}m {{ (obs.observation_duration_seconds % 60) }}s observed
+      </div>
+      {% endif %}
+    </div>
+    <div class="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+      {{ obs.observed_at[11:16] if obs.observed_at else '' }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center py-12 text-gray-400">
+  <div class="text-4xl mb-2">👀</div>
+  <p class="text-sm">No FMOs logged yet — start observing!</p>
+</div>
+{% endif %}

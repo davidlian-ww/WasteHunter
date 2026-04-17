@@ -154,6 +154,34 @@ def init_db():
         except Exception:
             pass  # Column already exists — sqlite3 raises OperationalError, not a problem
 
+        # ── Migration: add study_session_id to waste_observations ────────
+        # NOTE: moved outside with-block — see _migrate_study_session_id() call below
+
+        # ── Study Sessions table ─────────────────────────────────────────
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS study_sessions (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                path_id              INTEGER,
+                path_name            TEXT NOT NULL,
+                site_name            TEXT DEFAULT '',
+                observer             TEXT DEFAULT 'Anonymous',
+                started_at           TEXT DEFAULT CURRENT_TIMESTAMP,
+                ended_at             TEXT,
+                total_wall_seconds   INTEGER,
+                total_waste_seconds  INTEGER DEFAULT 0,
+                fmo_count            INTEGER DEFAULT 0,
+                status               TEXT DEFAULT 'active',
+                FOREIGN KEY (path_id) REFERENCES process_paths(id) ON DELETE SET NULL,
+                CHECK (status IN ('active', 'completed'))
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studies_path ON study_sessions(path_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studies_status ON study_sessions(status)"
+        )
+
         # ── PWA observations (raw sync from atlas-fmo PWA) ──────────────
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pwa_observations (
@@ -183,8 +211,34 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_pwa_site ON pwa_observations(site)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_pwa_ts   ON pwa_observations(timestamp)")
 
-    # Run after the main with-block so it gets its own connection
+    # Run after the main with-block so each gets its own isolated connection
     _migrate_waste_category_safety()
+    _migrate_study_session_id()
+
+
+def _migrate_study_session_id():
+    """Add study_session_id column to waste_observations if missing.
+    Uses its own direct connection with isolation_level=None so WAL
+    readers from a reloading parent process can't block the commit.
+    Idempotent.
+    """
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        cols = [r[1] for r in conn.execute(
+            "PRAGMA table_info(waste_observations)"
+        ).fetchall()]
+        if "study_session_id" in cols:
+            return  # already there
+    # Need autocommit for DDL on this SQLite version
+    conn = sqlite3.connect(DB_PATH, timeout=10, isolation_level=None)
+    try:
+        conn.execute(
+            "ALTER TABLE waste_observations "
+            "ADD COLUMN study_session_id INTEGER DEFAULT NULL"
+        )
+    except Exception:
+        pass  # race or already exists
+    finally:
+        conn.close()
 
 
 def _migrate_waste_category_safety():
@@ -885,3 +939,152 @@ def get_pwa_observations(site: Optional[str] = None, limit: int = 1000) -> List[
                 (limit,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── STUDY SESSIONS ──────────────────────────────────────────────────────
+
+def start_study(
+    path_name: str,
+    observer: str = "Anonymous",
+    path_id: Optional[int] = None,
+    site_name: str = "",
+) -> int:
+    """Create a new active study session and return its id."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO study_sessions
+               (path_id, path_name, site_name, observer, status)
+               VALUES (?, ?, ?, ?, 'active')""",
+            (path_id, path_name, site_name, observer),
+        )
+        return cursor.lastrowid
+
+
+def get_study(session_id: int) -> Optional[Dict[str, Any]]:
+    """Return study session row or None."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM study_sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_study_observations(session_id: int) -> List[Dict[str, Any]]:
+    """All waste observations logged against this study session."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT wo.id, wo.title, wo.waste_category, wo.severity,
+                   wo.status, wo.observed_at, wo.observation_duration_seconds,
+                   pp.name AS path_name
+            FROM   waste_observations wo
+            JOIN   process_steps ps ON wo.step_id = ps.id
+            JOIN   process_paths pp ON ps.path_id = pp.id
+            WHERE  wo.study_session_id = ?
+            ORDER  BY wo.observed_at DESC
+            """,
+            (session_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def log_fmo_in_study(
+    session_id: int,
+    process_path: str,
+    waste_category: str,
+    title: str,
+    description: str = "",
+    severity: str = "Medium",
+    observed_by: str = "Anonymous",
+    observation_duration_seconds: Optional[int] = None,
+) -> int:
+    """Quick-log an FMO that belongs to a study session."""
+    step_id = get_or_create_process_path(process_path)
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO waste_observations
+               (step_id, waste_category, title, description, severity, observed_by,
+                observation_duration_seconds, study_session_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (step_id, waste_category, title, description, severity, observed_by,
+             observation_duration_seconds, session_id),
+        )
+        obs_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO failure_modes (observation_id, occurrence_score, detection_score)"
+            " VALUES (?, 3, 3)",
+            (obs_id,),
+        )
+    return obs_id
+
+
+def end_study(session_id: int) -> Dict[str, Any]:
+    """Close a study session, compute + persist totals, return the summary dict."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        session = cursor.execute(
+            "SELECT * FROM study_sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+        if not session:
+            raise ValueError(f"Study session {session_id} not found")
+
+        # Compute wall time
+        from datetime import datetime, timezone
+        started = datetime.fromisoformat(session["started_at"].replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        wall_secs = int((now - started).total_seconds())
+
+        # Sum waste time + count FMOs for this session
+        agg = cursor.execute(
+            """
+            SELECT COUNT(*) AS fmo_count,
+                   COALESCE(SUM(observation_duration_seconds), 0) AS waste_secs
+            FROM   waste_observations
+            WHERE  study_session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        fmo_count  = agg["fmo_count"]
+        waste_secs = agg["waste_secs"]
+
+        cursor.execute(
+            """
+            UPDATE study_sessions
+            SET    ended_at            = CURRENT_TIMESTAMP,
+                   total_wall_seconds  = ?,
+                   total_waste_seconds = ?,
+                   fmo_count           = ?,
+                   status              = 'completed'
+            WHERE  id = ?
+            """,
+            (wall_secs, waste_secs, fmo_count, session_id),
+        )
+
+        # Category breakdown
+        cats = cursor.execute(
+            """
+            SELECT waste_category,
+                   COUNT(*) AS count,
+                   COALESCE(SUM(observation_duration_seconds), 0) AS waste_secs
+            FROM   waste_observations
+            WHERE  study_session_id = ?
+            GROUP  BY waste_category
+            ORDER  BY count DESC
+            """,
+            (session_id,),
+        ).fetchall()
+
+        return {
+            "session_id":         session_id,
+            "path_name":          session["path_name"],
+            "site_name":          session["site_name"],
+            "observer":           session["observer"],
+            "wall_seconds":       wall_secs,
+            "total_waste_seconds": waste_secs,
+            "fmo_count":          fmo_count,
+            "by_category":        [dict(r) for r in cats],
+        }

@@ -39,6 +39,7 @@ from app.database import (
     update_failure_mode, calculate_rpn, get_fma_analytics,
     quick_log_observation, get_all_process_path_names, get_recent_observations,
     import_from_forms_csv, upsert_pwa_observation, get_pwa_observations,
+    start_study, get_study, get_study_observations, log_fmo_in_study, end_study,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -627,3 +628,128 @@ async def filter_observations(
 async def get_fma_data():
     """API endpoint for FMA analytics data"""
     return get_fma_analytics()
+
+
+# ── STUDY SESSION ROUTES ────────────────────────────────────────────
+
+@app.post("/study/start", response_class=HTMLResponse)
+async def study_start(
+    request: Request,
+    path_id: int = Form(...),
+    path_name: str = Form(...),
+    site_name: str = Form(""),
+    observer: str = Form("Anonymous"),
+):
+    """Create a new study session and redirect to the active study page."""
+    session_id = start_study(
+        path_name=path_name,
+        observer=observer,
+        path_id=path_id,
+        site_name=site_name,
+    )
+    return RedirectResponse(f"/study/{session_id}", status_code=303)
+
+
+@app.get("/study/{session_id}", response_class=HTMLResponse)
+async def study_active(request: Request, session_id: int):
+    """Active study workspace — log FMOs with timed observations."""
+    session = get_study(session_id)
+    if not session or session["status"] != "active":
+        return RedirectResponse("/paths", status_code=303)
+    observations = get_study_observations(session_id)
+    total_waste = sum(
+        o["observation_duration_seconds"] or 0 for o in observations
+    )
+    return templates.TemplateResponse(request, "study_active.html", {
+        "session":         session,
+        "waste_categories": WASTE_CATEGORIES,
+        "observations":    observations,
+        "total_waste_seconds": total_waste,
+    })
+
+
+@app.post("/study/{session_id}/log", response_class=HTMLResponse)
+async def study_log_fmo(
+    request: Request,
+    session_id: int,
+    waste_category: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(""),
+    severity: str = Form("Medium"),
+    observed_by: str = Form("Anonymous"),
+    observation_duration_seconds: Optional[int] = Form(None),
+):
+    """Log one FMO inside an active study and return the refreshed obs list."""
+    session = get_study(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Study session not found")
+    log_fmo_in_study(
+        session_id=session_id,
+        process_path=session["path_name"],
+        waste_category=waste_category,
+        title=title,
+        description=description,
+        severity=severity,
+        observed_by=observed_by,
+        observation_duration_seconds=observation_duration_seconds,
+    )
+    observations = get_study_observations(session_id)
+    total_waste = sum(o["observation_duration_seconds"] or 0 for o in observations)
+    return templates.TemplateResponse(request, "components/study_obs_list.html", {
+        "observations": observations,
+        "total_waste_seconds": total_waste,
+        "session_id": session_id,
+    })
+
+
+@app.post("/study/{session_id}/end")
+async def study_end(session_id: int):
+    """End the study, compute totals, redirect to summary."""
+    session = get_study(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Study session not found")
+    end_study(session_id)
+    return RedirectResponse(f"/study/{session_id}/summary", status_code=303)
+
+
+@app.get("/study/{session_id}/summary", response_class=HTMLResponse)
+async def study_summary_page(request: Request, session_id: int):
+    """Post-study summary report — wall time, total waste time, FMO breakdown."""
+    session = get_study(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Study session not found")
+    observations = get_study_observations(session_id)
+
+    # Build per-category totals for Chart.js
+    cat_totals: dict = {}
+    for obs in observations:
+        cat = obs["waste_category"]
+        dur = obs["observation_duration_seconds"] or 0
+        if cat not in cat_totals:
+            cat_totals[cat] = {"count": 0, "secs": 0}
+        cat_totals[cat]["count"] += 1
+        cat_totals[cat]["secs"]  += dur
+
+    # Sort by time descending for the chart
+    sorted_cats = sorted(cat_totals.items(), key=lambda x: x[1]["secs"], reverse=True)
+
+    cat_chart_json = json.dumps({
+        "labels": [c for c, _ in sorted_cats],
+        "times":  [v["secs"] for _, v in sorted_cats],
+        "counts": [v["count"] for _, v in sorted_cats],
+        "colors": [
+            {"Transportation":"#dc2626","Inventory":"#ea580c","Motion":"#ca8a04",
+             "Waiting":"#0053e2","Overproduction":"#7c3aed","Over-processing":"#0891b2",
+             "Defects":"#dc2626","Safety":"#2a8703"}.get(c, "#6b7280")
+            for c, _ in sorted_cats
+        ],
+    })
+    total_waste = session.get("total_waste_seconds") or 0
+
+    return templates.TemplateResponse(request, "study_summary.html", {
+        "session":         session,
+        "observations":    observations,
+        "sorted_cats":     sorted_cats,
+        "total_waste":     total_waste,
+        "cat_chart_json":  cat_chart_json,
+    })

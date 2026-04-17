@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Study — {{ session.path_name }}{% endblock %}
+
+{% block content %}
+{# ── Study header bar ── #}
+<div class="rounded-xl shadow-sm overflow-hidden mb-5"
+     style="background:linear-gradient(135deg,#0053e2,#003db5)">
+  <div class="px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+    <div class="text-white">
+      <div class="text-xs font-semibold uppercase tracking-widest opacity-70 mb-0.5">
+        🔬 Active Study
+      </div>
+      <h1 class="text-2xl font-bold">{{ session.path_name }}</h1>
+      <div class="text-sm opacity-80 mt-0.5">
+        🏭 {{ session.site_name or 'FC' }} &nbsp;·&nbsp; 👤 {{ session.observer }}
+      </div>
+    </div>
+
+    {# Wall clock + End Study #}
+    <div class="flex items-center gap-4">
+      <div class="text-center">
+        <div class="text-xs text-blue-200 font-semibold uppercase tracking-wide mb-0.5">Study Time</div>
+        <div id="wall-clock"
+             data-started="{{ session.started_at }}"
+             class="font-mono text-4xl font-bold text-white tabular-nums">
+          0:00:00
+        </div>
+      </div>
+      <form method="post" action="/study/{{ session.id }}/end"
+            onsubmit="return confirm('End this study session?')">
+        <button type="submit"
+                class="px-5 py-3 rounded-xl font-bold text-sm transition-all
+                       bg-white text-[#0053e2] hover:bg-blue-50 active:scale-95 shadow">
+          ✅ End Study
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ── Two-column workspace ── #}
+<div class="grid grid-cols-5 gap-5 items-start">
+
+  {# LEFT — FMO log form ── #}
+  <div class="col-span-2">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-bold text-gray-800">➕ Log FMO</h2>
+        <p class="text-xs text-gray-500 mt-0.5">
+          Start the timer when you spot the failure, stop when you move on.
+        </p>
+      </div>
+
+      <form id="fmo-form"
+            hx-post="/study/{{ session.id }}/log"
+            hx-target="#obs-panel"
+            hx-swap="innerHTML"
+            hx-on--after-request="onFmoSuccess(event)"
+            class="p-5 space-y-4">
+
+        {# Waste category #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            Waste Category <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="wc-input" name="waste_category" value="" required>
+          <div class="grid grid-cols-4 gap-1.5" id="cat-grid">
+            {% set cats = [
+              ('T','Transportation','🚛','#dc2626','#fef2f2'),
+              ('I','Inventory','📦','#ea580c','#fff7ed'),
+              ('M','Motion','🏃','#ca8a04','#fefce8'),
+              ('W','Waiting','⏳','#0053e2','#eff6ff'),
+              ('O','Overproduction','📈','#7c3aed','#f5f3ff'),
+              ('O','Over-processing','⚙️','#0891b2','#ecfeff'),
+              ('D','Defects','❌','#dc2626','#fff1f2'),
+              ('S','Safety','🦺','#2a8703','#f0fdf4')
+            ] %}
+            {% for letter, name, icon, color, bgc in cats %}
+            <button type="button"
+                    data-category="{{ name }}"
+                    onclick="pickCat(this)"
+                    class="cat-btn flex flex-col items-center p-1.5 rounded-lg border-2
+                           border-gray-200 bg-gray-50 hover:border-gray-400
+                           transition-all text-center cursor-pointer">
+              <span class="text-lg leading-none">{{ icon }}</span>
+              <span class="text-xs font-bold mt-0.5" style="color:{{ color }}">{{ letter }}</span>
+              <span class="leading-tight mt-0.5 text-gray-500"
+                    style="font-size:0.55rem">{{ name.split('-')[0] }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          <p id="cat-err" class="text-xs text-red-500 mt-1 hidden">Select a category.</p>
+        </div>
+
+        {# Observation timer — counts time on THIS specific failure #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+            ⏱️ Observation Timer
+          </label>
+          <input type="hidden" id="dur-input" name="observation_duration_seconds" value="">
+          <div class="flex items-center gap-2 p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
+            <div id="obs-timer"
+                 class="font-mono text-lg font-bold tabular-nums"
+                 style="color:#0053e2;min-width:60px">0:00</div>
+            <div class="flex gap-1.5 flex-1">
+              <button type="button" id="obs-start" onclick="obsTimerStart()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold text-white"
+                      style="background:#0053e2">▶ Start</button>
+              <button type="button" id="obs-pause" onclick="obsTimerPause()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold hidden"
+                      style="background:#ffc220;color:#1e293b">⏸ Pause</button>
+              <button type="button" onclick="obsTimerReset()"
+                      class="flex-1 py-1.5 rounded-lg text-xs font-bold"
+                      style="background:#f1f5f9;color:#64748b">↺</button>
+            </div>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">
+            Start when you see the failure. Timer saves with this FMO.
+          </p>
+        </div>
+
+        {# Title #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+            What did you see? <span class="text-red-500">*</span>
+          </label>
+          <input name="title" required maxlength="120"
+                 placeholder="Brief description of the failure…"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                        focus:outline-none focus:ring-2">
+        </div>
+
+        {# Severity #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Severity</label>
+          <input type="hidden" id="sev-input" name="severity" value="Medium">
+          <div class="flex gap-1.5">
+            {% for sev, color, bg in [
+              ('Low','#2a8703','#f0fdf4'),('Medium','#ca8a04','#fefce8'),
+              ('High','#ea580c','#fff7ed'),('Critical','#dc2626','#fef2f2')
+            ] %}
+            <button type="button" data-severity="{{ sev }}" onclick="pickSev(this)"
+                    class="sev-btn flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-all"
+                    style="border-color:{{ color }}20;background:{{ bg }};color:{{ color }}"
+                    {% if sev == 'Medium' %}data-selected="true"{% endif %}>
+              {{ sev }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Observer name — carry forward between submissions #}
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Your Name</label>
+          <input name="observed_by" id="obs-name"
+                 value="{{ session.observer }}" placeholder="Anonymous"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                        focus:outline-none focus:ring-2">
+        </div>
+
+        <button type="submit"
+                class="w-full py-2.5 rounded-lg font-bold text-white text-sm
+                       transition-all hover:opacity-90 active:scale-95"
+                style="background:#0053e2">
+          Log FMO →
+        </button>
+
+      </form>
+
+      {# Mini toast #}
+      <div id="fmo-toast"
+           class="hidden mx-5 mb-4 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
+           style="background:#2a8703">
+        ✅ FMO logged!
+      </div>
+    </div>
+  </div>
+
+  {# RIGHT — live FMO list ── #}
+  <div class="col-span-3">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+        <h2 class="font-bold text-gray-800">📋 This Session's FMOs</h2>
+        <span class="text-xs text-gray-400">— auto-updates as you log</span>
+      </div>
+      <div id="obs-panel">
+        {% include "components/study_obs_list.html" %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ── Wall clock ─────────────────────────────────────────────────────── */
+(function () {
+  const el        = document.getElementById('wall-clock');
+  const rawStart  = el.dataset.started; // "YYYY-MM-DD HH:MM:SS" UTC from SQLite
+  // Parse as UTC (SQLite CURRENT_TIMESTAMP is UTC but has no Z suffix)
+  const startMs   = new Date(rawStart.replace(' ', 'T') + 'Z').getTime();
+
+  function fmt(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return (h ? h + ':' : '') +
+           String(m).padStart(h ? 2 : 1, '0') + ':' +
+           String(sec).padStart(2, '0');
+  }
+
+  setInterval(function () {
+    const elapsed = Math.floor((Date.now() - startMs) / 1000);
+    el.textContent = fmt(elapsed < 0 ? 0 : elapsed);
+  }, 500);
+})();
+
+/* ── Observation stopwatch ──────────────────────────────────────────── */
+let _oStart = null, _oElapsed = 0, _oInterval = null;
+
+function _oFmt(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m + ':' + String(sec).padStart(2, '0');
+}
+function _oTick() {
+  const t = _oElapsed + Math.floor((Date.now() - _oStart) / 1000);
+  document.getElementById('obs-timer').textContent = _oFmt(t);
+}
+function obsTimerStart() {
+  if (_oInterval) return;
+  _oStart    = Date.now();
+  _oInterval = setInterval(_oTick, 500);
+  document.getElementById('obs-start').classList.add('hidden');
+  document.getElementById('obs-pause').classList.remove('hidden');
+}
+function obsTimerPause() {
+  if (!_oInterval) return;
+  _oElapsed += Math.floor((Date.now() - _oStart) / 1000);
+  clearInterval(_oInterval); _oInterval = null; _oStart = null;
+  document.getElementById('obs-pause').classList.add('hidden');
+  const sb = document.getElementById('obs-start');
+  sb.textContent = '▶ Resume'; sb.classList.remove('hidden');
+}
+function obsTimerReset() {
+  clearInterval(_oInterval); _oInterval = null; _oStart = null; _oElapsed = 0;
+  document.getElementById('obs-timer').textContent = '0:00';
+  document.getElementById('dur-input').value = '';
+  document.getElementById('obs-pause').classList.add('hidden');
+  const sb = document.getElementById('obs-start');
+  sb.textContent = '▶ Start'; sb.classList.remove('hidden');
+}
+function _oCapture() {
+  let t = _oElapsed;
+  if (_oInterval && _oStart) t += Math.floor((Date.now() - _oStart) / 1000);
+  if (t > 0) document.getElementById('dur-input').value = t;
+}
+
+/* ── Category picker ────────────────────────────────────────────────── */
+function pickCat(btn) {
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.style.borderColor = '#e5e7eb'; b.style.background = '#f9fafb';
+    b.removeAttribute('data-selected');
+  });
+  btn.style.borderColor = '#0053e2'; btn.style.background = '#eff6ff';
+  btn.setAttribute('data-selected', 'true');
+  document.getElementById('wc-input').value = btn.dataset.category;
+  document.getElementById('cat-err').classList.add('hidden');
+}
+
+/* ── Severity picker ────────────────────────────────────────────────── */
+const SEV = {
+  Low:{'color':'#2a8703','bg':'#f0fdf4'}, Medium:{'color':'#ca8a04','bg':'#fefce8'},
+  High:{'color':'#ea580c','bg':'#fff7ed'}, Critical:{'color':'#dc2626','bg':'#fef2f2'},
+};
+function pickSev(btn) {
+  document.querySelectorAll('.sev-btn').forEach(b => {
+    const s = SEV[b.dataset.severity];
+    b.style.borderColor = s.color + '20'; b.style.background = s.bg;
+    b.style.opacity = '0.7'; b.removeAttribute('data-selected');
+  });
+  btn.style.borderColor = SEV[btn.dataset.severity].color;
+  btn.style.opacity = '1'; btn.setAttribute('data-selected', 'true');
+  document.getElementById('sev-input').value = btn.dataset.severity;
+}
+// Initialise Medium
+pickSev(document.querySelector('.sev-btn[data-severity="Medium"]'));
+
+/* ── Form submit ────────────────────────────────────────────────────── */
+document.getElementById('fmo-form').addEventListener('submit', function (e) {
+  if (!document.getElementById('wc-input').value) {
+    e.preventDefault();
+    document.getElementById('cat-err').classList.remove('hidden');
+    return;
+  }
+  _oCapture();  // save duration before reset
+});
+
+function onFmoSuccess(e) {
+  if (!e.detail.successful) return;
+  // Reset form but keep observer name
+  const name = document.getElementById('obs-name').value;
+  document.getElementById('fmo-form').reset();
+  document.getElementById('obs-name').value = name;
+  document.getElementById('wc-input').value = '';
+  document.getElementById('sev-input').value = 'Medium';
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.style.borderColor = '#e5e7eb'; b.style.background = '#f9fafb';
+  });
+  pickSev(document.querySelector('.sev-btn[data-severity="Medium"]'));
+  obsTimerReset();
+
+  const t = document.getElementById('fmo-toast');
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 2000);
+}
+</script>
+{% endblock %}
