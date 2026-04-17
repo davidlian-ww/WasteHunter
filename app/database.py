@@ -214,6 +214,29 @@ def init_db():
     # Run after the main with-block so each gets its own isolated connection
     _migrate_waste_category_safety()
     _migrate_study_session_id()
+    _migrate_source_column()
+
+
+def _migrate_source_column():
+    """Add source TEXT DEFAULT 'live' to waste_observations if missing.
+    Idempotent — safe to call on every startup.
+    """
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        cols = [r[1] for r in conn.execute(
+            "PRAGMA table_info(waste_observations)"
+        ).fetchall()]
+        if "source" in cols:
+            return
+    conn = sqlite3.connect(DB_PATH, timeout=10, isolation_level=None)
+    try:
+        conn.execute(
+            "ALTER TABLE waste_observations "
+            "ADD COLUMN source TEXT DEFAULT 'live'"
+        )
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 
 def _migrate_study_session_id():
@@ -708,18 +731,21 @@ def quick_log_observation(
     observed_by: str = "Anonymous",
     initial_comment: str = "",
     observation_duration_seconds: Optional[int] = None,
+    observed_at: Optional[str] = None,
+    source: str = "live",
 ) -> int:
     """One-shot: create observation (+ FMA + optional comment) from a path name."""
     step_id = get_or_create_process_path(process_path)
+    ts = observed_at or datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO waste_observations
                (step_id, waste_category, title, description, severity, observed_by,
-                observation_duration_seconds)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                observation_duration_seconds, observed_at, source)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (step_id, waste_category, title, description, severity, observed_by,
-             observation_duration_seconds),
+             observation_duration_seconds, ts, source),
         )
         obs_id = cursor.lastrowid
         # Auto FMA record
@@ -774,16 +800,27 @@ def get_recent_observations(limit: int = 50) -> List[Dict[str, Any]]:
 # ── MICROSOFT FORMS CSV IMPORT ─────────────────────────────────────
 # Column aliases: keys are what we look for (lowercase), value is our field.
 _COL_MAP = {
-    "process path":      "process_path",
-    "waste category":    "waste_category",
-    "observation title": "title",
-    "details":           "description",
-    "severity":          "severity",
-    "your name":         "observed_by",
-    "initial comment / notes": "initial_comment",
-    "initial comment":   "initial_comment",
-    "notes":             "initial_comment",
-    "comment":           "initial_comment",
+    "process path":           "process_path",
+    "waste category":         "waste_category",
+    "observation title":      "title",
+    "details":                "description",
+    "severity":               "severity",
+    "your name":              "observed_by",
+    "observer":               "observed_by",
+    "observed by":            "observed_by",
+    "initial comment / notes":"initial_comment",
+    "initial comment":        "initial_comment",
+    "notes":                  "initial_comment",
+    "comment":                "initial_comment",
+    # Date / time columns from various export formats
+    "date":                   "observed_at",
+    "observed at":            "observed_at",
+    "observation date":       "observed_at",
+    "timestamp":              "observed_at",
+    "start time":             "observed_at",
+    "completion time":        "observed_at",
+    "submitted at":           "observed_at",
+    "response date":          "observed_at",
 }
 
 _VALID_CATEGORIES = {
@@ -849,8 +886,10 @@ def import_from_forms_csv(csv_bytes: bytes) -> Tuple[int, int, List[str]]:
                 title=mapped["title"],
                 description=mapped.get("description", ""),
                 severity=sev,
-                observed_by=mapped.get("observed_by", "Forms Import") or "Forms Import",
+                observed_by=mapped.get("observed_by", "CSV Import") or "CSV Import",
                 initial_comment=mapped.get("initial_comment", ""),
+                observed_at=mapped.get("observed_at") or None,
+                source="csv-import",
             )
             imported += 1
         except Exception as exc:
@@ -1132,3 +1171,80 @@ def get_studies_stats() -> Dict[str, Any]:
             """
         ).fetchone()
         return dict(row)
+
+
+def get_bank_observations(
+    source: Optional[str] = None,      # 'live','csv-import','manual-import','json-import'
+    path: Optional[str] = None,
+    category: Optional[str] = None,
+    q: Optional[str] = None,           # free-text search on title/description
+    date_from: Optional[str] = None,   # YYYY-MM-DD
+    date_to: Optional[str] = None,     # YYYY-MM-DD
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    """Flexible query over waste_observations — powers the Data Bank page."""
+    with get_db() as conn:
+        clauses: List[str] = []
+        params: List[Any] = []
+
+        if source and source != "all":
+            clauses.append("wo.source = ?")
+            params.append(source)
+        if path:
+            clauses.append("pp.name LIKE ?")
+            params.append(f"%{path}%")
+        if category:
+            clauses.append("wo.waste_category = ?")
+            params.append(category)
+        if q:
+            clauses.append("(wo.title LIKE ? OR wo.description LIKE ?)")
+            params += [f"%{q}%", f"%{q}%"]
+        if date_from:
+            clauses.append("DATE(wo.observed_at) >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("DATE(wo.observed_at) <= ?")
+            params.append(date_to)
+
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        rows = conn.execute(
+            f"""
+            SELECT wo.*, pp.name AS path_name
+            FROM   waste_observations wo
+            JOIN   process_steps      ps ON wo.step_id  = ps.id
+            JOIN   process_paths      pp ON ps.path_id  = pp.id
+            {where}
+            ORDER  BY wo.observed_at DESC
+            LIMIT  ?
+            """,
+            params + [limit],
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_bank_stats() -> Dict[str, Any]:
+    """Aggregate counts by source + category for the Data Bank KPI bar."""
+    with get_db() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM waste_observations"
+        ).fetchone()[0]
+        by_source = conn.execute(
+            """SELECT COALESCE(source,'live') AS src, COUNT(*) AS n
+               FROM waste_observations GROUP BY src ORDER BY n DESC"""
+        ).fetchall()
+        by_cat = conn.execute(
+            """SELECT waste_category, COUNT(*) AS n
+               FROM waste_observations GROUP BY waste_category ORDER BY n DESC"""
+        ).fetchall()
+        date_range = conn.execute(
+            """SELECT MIN(DATE(observed_at)) AS oldest,
+                      MAX(DATE(observed_at)) AS newest
+               FROM waste_observations"""
+        ).fetchone()
+        return {
+            "total":      total,
+            "by_source":  [dict(r) for r in by_source],
+            "by_category":[dict(r) for r in by_cat],
+            "oldest":     date_range["oldest"] or "—",
+            "newest":     date_range["newest"] or "—",
+        }

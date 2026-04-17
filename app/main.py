@@ -41,6 +41,7 @@ from app.database import (
     import_from_forms_csv, upsert_pwa_observation, get_pwa_observations,
     start_study, get_study, get_study_observations, log_fmo_in_study, end_study,
     get_all_studies, get_studies_stats,
+    get_bank_observations, get_bank_stats,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -631,7 +632,121 @@ async def get_fma_data():
     return get_fma_analytics()
 
 
-# ── STUDY SESSION ROUTES ──────────────────────────────────────────────────
+# ── DATA BANK ROUTES ─────────────────────────────────────────────────────────
+
+@app.get("/bank", response_class=HTMLResponse)
+async def bank_page(
+    request:   Request,
+    source:    Optional[str] = None,
+    path:      Optional[str] = None,
+    category:  Optional[str] = None,
+    q:         Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
+):
+    """Data Bank — browse, upload, and manually enter historical observations."""
+    obs   = get_bank_observations(
+        source=source, path=path, category=category,
+        q=q, date_from=date_from, date_to=date_to,
+    )
+    stats = get_bank_stats()
+    paths = get_all_process_path_names()
+    return templates.TemplateResponse(request, "bank.html", {
+        "observations": obs,
+        "stats":        stats,
+        "paths":        paths,
+        "f_source":     source   or "",
+        "f_path":       path     or "",
+        "f_category":   category or "",
+        "f_q":          q        or "",
+        "f_date_from":  date_from or "",
+        "f_date_to":    date_to  or "",
+        "waste_categories": [
+            "Transportation","Inventory","Motion","Waiting",
+            "Overproduction","Over-processing","Defects","Safety",
+        ],
+    })
+
+
+@app.post("/bank/upload", response_class=HTMLResponse)
+async def bank_upload(request: Request, file: UploadFile = File(...)):
+    """CSV upload to the data bank — source tagged as 'csv-import'."""
+    if not file.filename.lower().endswith(".csv"):
+        return HTMLResponse(
+            '<p class="text-red-600 font-semibold">Only .csv files are accepted.</p>',
+            status_code=400,
+        )
+    csv_bytes = await file.read()
+    imported, skipped, errors = import_from_forms_csv(csv_bytes)
+    stats = get_bank_stats()
+    return templates.TemplateResponse(request, "components/bank_upload_result.html", {
+        "imported": imported,
+        "skipped":  skipped,
+        "errors":   errors,
+        "stats":    stats,
+    })
+
+
+@app.post("/bank/manual", response_class=HTMLResponse)
+async def bank_manual(
+    request:       Request,
+    process_path:  str          = Form(...),
+    waste_category: str         = Form(...),
+    title:         str          = Form(...),
+    description:   str          = Form(""),
+    severity:      str          = Form("Medium"),
+    observed_by:   str          = Form("Anonymous"),
+    observed_at:   str          = Form(""),
+):
+    """Manual back-dated entry into the data bank."""
+    ts = observed_at.replace("T", " ") if observed_at else None
+    quick_log_observation(
+        process_path=process_path,
+        waste_category=waste_category,
+        title=title.strip(),
+        description=description.strip(),
+        severity=severity,
+        observed_by=observed_by.strip() or "Anonymous",
+        observed_at=ts,
+        source="manual-import",
+    )
+    obs   = get_bank_observations()
+    stats = get_bank_stats()
+    return templates.TemplateResponse(request, "components/bank_upload_result.html", {
+        "imported": 1,
+        "skipped":  0,
+        "errors":   [],
+        "stats":    stats,
+    })
+
+
+@app.get("/bank/export")
+async def bank_export(
+    source:    Optional[str] = None,
+    path:      Optional[str] = None,
+    category:  Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
+):
+    """Download the current bank view as a CSV file."""
+    obs = get_bank_observations(
+        source=source, path=path, category=category,
+        date_from=date_from, date_to=date_to, limit=100_000,
+    )
+    buf = _io.StringIO()
+    fields = ["id","path_name","waste_category","title","description",
+              "severity","status","observed_by","observed_at","source"]
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(obs)
+    return HTMLResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="bank_export.csv"'},
+    )
+
+
+# ── STUDY SESSION ROUTES ──────────────────────────────────────────────────────
 
 @app.get("/studies", response_class=HTMLResponse)
 async def studies_list(request: Request,

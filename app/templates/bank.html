@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}Data Bank — TIMWOOD{% endblock %}
+
+{% block content %}
+
+{% set source_labels = {
+  'live':          {'label':'Live',        'icon':'📡','color':'#0053e2','bg':'#eff6ff'},
+  'csv-import':    {'label':'CSV Import',  'icon':'📄','color':'#7c3aed','bg':'#f5f3ff'},
+  'manual-import': {'label':'Manual Entry','icon':'✏️','color':'#ea580c','bg':'#fff7ed'},
+  'json-import':   {'label':'JSON Import', 'icon':'📦','color':'#0891b2','bg':'#ecfeff'},
+} %}
+{% set cat_icons = {
+  'Transportation':'🚛','Inventory':'📦','Motion':'🏃','Waiting':'⏳',
+  'Overproduction':'📈','Over-processing':'⚙️','Defects':'❌','Safety':'🦺',
+} %}
+{% set sev_colors = {
+  'Critical':'#ea1100','High':'#ea580c','Medium':'#ca8a04','Low':'#2a8703'
+} %}
+
+{# ── Header ── #}
+<div class="flex items-center justify-between mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">📦 Data Bank</h1>
+    <p class="text-sm text-gray-500 mt-0.5">
+      Dump old observations here — upload a CSV, enter one manually, or browse everything.
+    </p>
+  </div>
+  <a href="/bank/export{% if f_source or f_path or f_category or f_date_from or f_date_to %}?{% endif %}{% if f_source %}source={{ f_source }}&{% endif %}{% if f_path %}path={{ f_path }}&{% endif %}{% if f_category %}category={{ f_category }}&{% endif %}{% if f_date_from %}date_from={{ f_date_from }}&{% endif %}{% if f_date_to %}date_to={{ f_date_to }}{% endif %}"
+     class="px-4 py-2 rounded-lg text-sm font-bold border border-gray-300
+            hover:bg-gray-50 transition flex items-center gap-1.5">
+    ⬇️ Export CSV
+  </a>
+</div>
+
+{# ── KPI bar ── #}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <div class="text-2xl font-bold text-gray-900 tabular-nums">{{ stats.total }}</div>
+    <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">📋 Total Records</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <div class="text-2xl font-bold tabular-nums" style="color:#0053e2">{{ stats.oldest }}</div>
+    <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">📅 Oldest Entry</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <div class="text-2xl font-bold tabular-nums" style="color:#2a8703">{{ stats.newest }}</div>
+    <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">🆕 Newest Entry</div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">By Source</div>
+    {% for row in stats.by_source %}
+    {% set sl = source_labels.get(row.src, {'label': row.src, 'icon':'?', 'color':'#6b7280', 'bg':'#f9fafb'}) %}
+    <div class="flex items-center justify-between text-xs mb-1">
+      <span style="color:{{ sl.color }}">{{ sl.icon }} {{ sl.label }}</span>
+      <span class="font-bold text-gray-700">{{ row.n }}</span>
+    </div>
+    {% else %}
+    <div class="text-xs text-gray-400">No data yet</div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Main layout: inputs on left, table on right ── #}
+<div class="grid grid-cols-5 gap-5">
+
+  {# ── Left column: upload + manual entry ── #}
+  <div class="col-span-2 flex flex-col gap-4">
+
+    {# CSV Upload card #}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-bold text-gray-800">📄 Upload CSV</h2>
+        <p class="text-xs text-gray-400 mt-0.5">
+          Microsoft Forms export, Excel CSV, or any CSV with columns:
+          <em>Process Path, Waste Category, Observation Title, Date</em>
+        </p>
+      </div>
+      <div class="p-5">
+        <form hx-post="/bank/upload"
+              hx-target="#upload-result"
+              hx-swap="innerHTML"
+              hx-encoding="multipart/form-data"
+              hx-indicator="#upload-spinner">
+          <label for="bank-file"
+                 class="flex flex-col items-center justify-center w-full h-32
+                        border-2 border-dashed border-gray-200 rounded-xl
+                        cursor-pointer hover:border-blue-400 hover:bg-blue-50
+                        transition text-center p-4 text-gray-400 text-sm">
+            <span class="text-3xl mb-1">📂</span>
+            <span>Click to choose a <strong>.csv</strong> file</span>
+            <span class="text-xs mt-0.5 text-gray-300">or drag and drop here</span>
+            <input id="bank-file" name="file" type="file" accept=".csv"
+                   class="hidden" onchange="this.form.dispatchEvent(new Event('submit',{bubbles:true}))">
+          </label>
+          <div id="upload-spinner"
+               class="htmx-indicator text-xs text-center text-blue-600 mt-2">
+            Uploading…
+          </div>
+        </form>
+        <div id="upload-result" class="mt-3"></div>
+      </div>
+    </div>
+
+    {# Manual entry card #}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-bold text-gray-800">✏️ Manual Entry</h2>
+        <p class="text-xs text-gray-400 mt-0.5">
+          Enter a single old observation with its original date.
+        </p>
+      </div>
+      <div class="p-5">
+        <form hx-post="/bank/manual"
+              hx-target="#manual-result"
+              hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) this.reset()"
+              class="flex flex-col gap-3">
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Date &amp; Time *</label>
+              <input type="datetime-local" name="observed_at" required
+                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                            focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Observer</label>
+              <input type="text" name="observed_by" placeholder="Name"
+                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                            focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Process Path *</label>
+            <input type="text" name="process_path" list="bank-paths-list"
+                   placeholder="e.g. IB Inbound" required
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                          focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <datalist id="bank-paths-list">
+              {% for p in paths %}<option value="{{ p }}">{% endfor %}
+            </datalist>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Waste Category *</label>
+              <select name="waste_category" required
+                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:ring-blue-200">
+                {% for cat in waste_categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Severity</label>
+              <select name="severity"
+                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Title *</label>
+            <input type="text" name="title" placeholder="Brief observation title" required
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                          focus:outline-none focus:ring-2 focus:ring-blue-200">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+            <textarea name="description" rows="2" placeholder="Optional details…"
+                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"></textarea>
+          </div>
+
+          <button type="submit"
+                  class="w-full py-2.5 rounded-lg font-bold text-sm text-white transition
+                         hover:opacity-90"
+                  style="background:#0053e2">
+            ➕ Add to Bank
+          </button>
+        </form>
+        <div id="manual-result" class="mt-3"></div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Right column: filter bar + data table ── #}
+  <div class="col-span-3">
+
+    {# Filter bar #}
+    <form method="get" action="/bank"
+          class="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 mb-3
+                 flex flex-wrap gap-2 items-end">
+      <div class="flex-1 min-w-[120px]">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Source</label>
+        <select name="source"
+                class="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs">
+          <option value="">All sources</option>
+          <option value="live"          {% if f_source=='live'          %}selected{% endif %}>📡 Live</option>
+          <option value="csv-import"    {% if f_source=='csv-import'    %}selected{% endif %}>📄 CSV Import</option>
+          <option value="manual-import" {% if f_source=='manual-import' %}selected{% endif %}>✏️ Manual</option>
+          <option value="json-import"   {% if f_source=='json-import'   %}selected{% endif %}>📦 JSON</option>
+        </select>
+      </div>
+      <div class="flex-1 min-w-[120px]">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+        <select name="category"
+                class="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs">
+          <option value="">All</option>
+          {% for cat in waste_categories %}
+          <option value="{{ cat }}" {% if f_category == cat %}selected{% endif %}>
+            {{ cat_icons.get(cat, '') }} {{ cat }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex-1 min-w-[100px]">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">From</label>
+        <input type="date" name="date_from" value="{{ f_date_from }}"
+               class="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs">
+      </div>
+      <div class="flex-1 min-w-[100px]">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">To</label>
+        <input type="date" name="date_to" value="{{ f_date_to }}"
+               class="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs">
+      </div>
+      <div class="flex-1 min-w-[140px]">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Search</label>
+        <input type="text" name="q" value="{{ f_q }}" placeholder="title / description…"
+               class="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs">
+      </div>
+      <div class="flex gap-1.5">
+        <button type="submit"
+                class="px-3 py-2 rounded-lg text-white text-xs font-bold hover:opacity-90"
+                style="background:#0053e2">
+          Filter
+        </button>
+        {% if f_source or f_path or f_category or f_q or f_date_from or f_date_to %}
+        <a href="/bank"
+           class="px-3 py-2 rounded-lg text-xs font-semibold border border-gray-200
+                  hover:bg-gray-50 transition">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+
+    {# Data table #}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {% if observations %}
+      <div class="overflow-x-auto overflow-y-auto" style="max-height:640px">
+        <table class="w-full text-xs">
+          <thead class="sticky top-0 z-10">
+            <tr class="bg-gray-50 border-b border-gray-100 text-gray-500
+                       font-semibold uppercase tracking-wide">
+              <th class="px-3 py-2.5 text-left">Date</th>
+              <th class="px-3 py-2.5 text-left">Path</th>
+              <th class="px-3 py-2.5 text-left">Category</th>
+              <th class="px-3 py-2.5 text-left">Title</th>
+              <th class="px-3 py-2.5 text-left">Sev.</th>
+              <th class="px-3 py-2.5 text-left">Observer</th>
+              <th class="px-3 py-2.5 text-left">Source</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for obs in observations %}
+            {% set sl = source_labels.get(obs.source or 'live',
+                         {'label': obs.source or 'live','icon':'?','color':'#6b7280','bg':'#f9fafb'}) %}
+            {% set sc = sev_colors.get(obs.severity, '#6b7280') %}
+            <tr class="hover:bg-gray-50 transition">
+              <td class="px-3 py-2 whitespace-nowrap text-gray-500 font-mono">
+                {{ obs.observed_at[:16] if obs.observed_at else '—' }}
+              </td>
+              <td class="px-3 py-2 text-gray-700 font-medium max-w-[120px] truncate"
+                  title="{{ obs.path_name }}">
+                {{ obs.path_name }}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <span class="font-semibold" style="color:#374151">
+                  {{ cat_icons.get(obs.waste_category,'') }} {{ obs.waste_category }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-gray-800 max-w-[200px] truncate"
+                  title="{{ obs.title }}">
+                {{ obs.title }}
+              </td>
+              <td class="px-3 py-2 font-bold whitespace-nowrap" style="color:{{ sc }}">
+                {{ obs.severity }}
+              </td>
+              <td class="px-3 py-2 text-gray-500 max-w-[100px] truncate"
+                  title="{{ obs.observed_by }}">
+                {{ obs.observed_by or '—' }}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <span class="px-1.5 py-0.5 rounded text-xs font-bold"
+                      style="background:{{ sl.bg }};color:{{ sl.color }}">
+                  {{ sl.icon }} {{ sl.label }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400
+                  flex items-center justify-between">
+        <span>
+          Showing {{ observations | length }} record{{ 's' if observations | length != 1 else '' }}
+          {% if f_source or f_path or f_category or f_q or f_date_from or f_date_to %}
+            (filtered)
+          {% endif %}
+        </span>
+        <a href="/bank/export{% if f_source or f_category or f_date_from or f_date_to %}?{% endif %}{% if f_source %}source={{ f_source }}&{% endif %}{% if f_category %}category={{ f_category }}&{% endif %}{% if f_date_from %}date_from={{ f_date_from }}&{% endif %}{% if f_date_to %}date_to={{ f_date_to }}{% endif %}"
+           class="text-blue-600 hover:underline font-semibold">
+          ⬇️ Export this view
+        </a>
+      </div>
+      {% else %}
+      <div class="py-20 flex flex-col items-center text-gray-400">
+        <div class="text-5xl mb-3">📦</div>
+        <p class="font-semibold text-gray-600">The bank is empty</p>
+        <p class="text-sm mt-1">
+          Upload a CSV or add a manual entry to get started.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

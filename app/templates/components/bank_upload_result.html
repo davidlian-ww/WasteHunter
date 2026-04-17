@@ -1,0 +1,26 @@
+{# HTMX partial: result of a CSV upload or manual entry to the bank #}
+{% if imported %}
+<div class="rounded-lg p-4 border" style="background:#f0fdf4;border-color:#2a8703">
+  <div class="font-bold text-green-800 mb-1">✅ {{ imported }} record{{ 's' if imported != 1 else '' }} added to the bank</div>
+  <div class="text-sm text-green-700">
+    Total in bank: <strong>{{ stats.total }}</strong> observations
+    spanning <strong>{{ stats.oldest }}</strong> → <strong>{{ stats.newest }}</strong>
+  </div>
+</div>
+{% endif %}
+
+{% if skipped %}
+<div class="rounded-lg p-3 mt-2 border text-sm" style="background:#fef2f2;border-color:#ea1100">
+  <div class="font-bold text-red-700">⚠️ {{ skipped }} row{{ 's' if skipped != 1 else '' }} skipped</div>
+  {% for err in errors[:5] %}
+  <div class="text-red-600 text-xs mt-0.5">{{ err }}</div>
+  {% endfor %}
+  {% if errors | length > 5 %}
+  <div class="text-red-400 text-xs mt-0.5">… and {{ errors | length - 5 }} more</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if not imported and not skipped %}
+<div class="text-gray-400 text-sm p-3">Nothing was imported.</div>
+{% endif %}
