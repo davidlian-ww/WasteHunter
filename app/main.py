@@ -1,8 +1,10 @@
 """Main FastAPI application for TIMWOOD Waste Dashboard with FMA Analysis"""
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from typing import Optional
 import csv
 import io as _io
@@ -36,10 +38,18 @@ from app.database import (
     get_path_details, WASTE_CATEGORIES, create_failure_mode, get_failure_mode,
     update_failure_mode, calculate_rpn, get_fma_analytics,
     quick_log_observation, get_all_process_path_names, get_recent_observations,
-    import_from_forms_csv,
+    import_from_forms_csv, upsert_pwa_observation, get_pwa_observations,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
+
+# Allow the atlas-fmo PWA (any origin on Eagle WiFi) to POST observations
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -53,6 +63,44 @@ async def startup():
 @app.get("/health")
 async def health():
     return {"status": "OK"}
+
+
+# ── PWA SYNC ENDPOINTS ───────────────────────────────────────────
+
+class PWAObservation(BaseModel):
+    id: int
+    observer: str = "Anonymous"
+    site: str = ""
+    shift: str = ""
+    process_path: str = ""
+    observer_area: str = ""
+    waste_category: str
+    title: str
+    description: str = ""
+    severity: str = "Medium"
+    timestamp: str
+    observation_duration_seconds: Optional[int] = None
+
+
+@app.post("/api/pwa/observations")
+async def receive_pwa_observation(obs: PWAObservation):
+    """Receives one observation from the atlas-fmo PWA.
+    Idempotent — safe to retry on network failure.
+    """
+    is_new = upsert_pwa_observation(obs.model_dump())
+    return {"ok": True, "new": is_new, "id": obs.id}
+
+
+@app.get("/api/pwa/observations")
+async def fetch_pwa_observations(
+    site: Optional[str] = None,
+    limit: int = 1000,
+):
+    """Returns all synced PWA observations, newest first.
+    Optionally filter by site code (e.g. ?site=IND2).
+    """
+    return get_pwa_observations(site=site, limit=limit)
+
 
 
 def _lan_ip() -> str:

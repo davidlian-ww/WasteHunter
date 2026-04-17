@@ -185,7 +185,7 @@ def sync_from_sharepoint(token: str) -> Dict[str, int]:
         # Validate required fields
         if not title or waste_category not in (
             "Transportation","Inventory","Motion","Waiting",
-            "Overproduction","Over-processing","Defects"
+            "Overproduction","Over-processing","Defects","Safety"
         ):
             log.warning("Skipping SP item %s — missing/invalid fields", sp_id)
             skipped += 1
@@ -215,7 +215,7 @@ _CHANNEL_ID = "19:0f298560d33349039762025a10b35794@thread.tacv2"
 _FMO_MARKER = "<!-- FMO_JSON:"
 _VALID_CATS = {
     "Transportation", "Inventory", "Motion", "Waiting",
-    "Overproduction", "Over-processing", "Defects",
+    "Overproduction", "Over-processing", "Defects", "Safety",
 }
 _VALID_SEVS = {"Low", "Medium", "High", "Critical"}
 

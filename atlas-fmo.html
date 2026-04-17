@@ -301,6 +301,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     </div>
     <h1 style="font-size:1.5rem">⚡ Waste Hunter</h1>
     <p id="home-shift-dept" style="opacity:.85;font-size:.85rem">—</p>
+    <div id="sync-home-badge" style="display:none;margin-top:6px;font-size:.65rem;font-weight:800;
+         letter-spacing:.06em;opacity:.9"></div>
   </div>
   <div class="content">
     <!-- ── Location card (site + observation area in one) ── -->
@@ -697,24 +699,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <div id="s-webhook-setup" class="screen">
   <div class="hdr">
     <div class="hdr-top"><span class="hdr-brand">Configuration</span></div>
-    <h1>Teams Webhook</h1><p>One-time setup for Teams integration</p>
+    <h1>⚙️ Settings</h1><p>Sync &amp; notifications</p>
   </div>
   <div class="content">
+    <!-- Sync API -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title">📡 Central Sync Server</div>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--muted);margin-bottom:12px">
+        Enter the server address your manager is running.<br>
+        Observations will sync automatically — no exports needed.
+      </p>
+      <div class="field"><label>Sync Server URL</label>
+        <input id="sync-url" type="url" placeholder="http://10.x.x.x:8001">
+      </div>
+      <div id="sync-status-msg" style="font-size:.75rem;margin-top:6px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSyncUrl()">Save URL</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="testSyncUrl()">Test Connection</button>
+      </div>
+    </div>
+    <!-- Teams Webhook -->
     <div class="card">
-      <div class="section-title">📋 Setup Steps</div>
+      <div class="section-title">📣 Teams Webhook (optional)</div>
       <p style="font-size:.85rem;line-height:1.7;color:var(--muted);margin-bottom:12px">
-        1. Open <strong>Teams → IND2 Leaders</strong><br>
-        2. Go to <strong>Quality Channel</strong><br>
-        3. Click <strong>··· → Connectors → Incoming Webhook</strong><br>
-        4. Name it <em>"FMO Observations"</em><br>
-        5. Copy the webhook URL &amp; paste below
+        1. Open <strong>Teams → Quality Channel</strong><br>
+        2. Click <strong>··· → Connectors → Incoming Webhook</strong><br>
+        3. Name it <em>"FMO Observations"</em> → copy URL below
       </p>
       <div class="field"><label>Webhook URL</label>
         <input id="wh-url" type="url" placeholder="https://...webhook.office.com/...">
       </div>
     </div>
-    <button class="btn btn-primary" onclick="saveWebhook()">💾 Save Webhook URL</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="goHome()">← Skip for now</button>
+    <button class="btn btn-primary" onclick="saveSettings()">💾 Save All Settings</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="goHome()">← Back</button>
   </div>
 </div>
 
@@ -788,6 +805,7 @@ const CATS = [
   {k:'Overproduction', icon:'📈', color:'#7c3aed', grad:'linear-gradient(135deg,#f5f3ff,#ddd6fe)', desc:'More than needed or early'},
   {k:'Over-processing',icon:'⚙️',  color:'#0891b2', grad:'linear-gradient(135deg,#ecfeff,#a5f3fc)', desc:'Unnecessary extra work'},
   {k:'Defects',        icon:'⚠️',  color:'#ea1100', grad:'linear-gradient(135deg,#fef2f2,#fecaca)', desc:'Errors needing rework'},
+  {k:'Safety',         icon:'🦺', color:'#2a8703', grad:'linear-gradient(135deg,#f0fdf4,#bbf7d0)', desc:'Hazards & unsafe conditions'},
 ];
 const SEVS = [
   {k:'Low',      icon:'🟢', color:'#2a8703', bg:'#f0fdf4', desc:'Minor — note &amp; monitor'},
@@ -1117,6 +1135,9 @@ async function submitObs(){
   databank.push(entry);
   localStorage.setItem('fmo_databank', JSON.stringify(databank));
 
+  // Auto-sync to central API (fire & forget — queued on failure)
+  syncObservation(entry);
+
   // Attempt Teams webhook
   const wUrl = localStorage.getItem('fmo_webhook');
   let teamsOk = false;
@@ -1271,18 +1292,39 @@ const SEV_META = {
 };
 
 function goHub(){
-  renderHub();
   show('s-hub');
+  // Optimistic render from local data immediately
+  renderHub(databank);
+  // Then try to fetch live from API and re-render
+  const url = getSyncUrl();
+  if(!url) return;
+  document.getElementById('hub-subtitle').textContent = '⏳ Fetching live data…';
+  fetch(`${url}/api/pwa/observations`, {signal: AbortSignal.timeout(6000)})
+    .then(r => r.ok ? r.json() : null)
+    .then(rows => {
+      if(!rows) return;
+      // Merge API rows into local databank (dedup by id)
+      const ids = new Set(databank.map(e=>e.id));
+      rows.forEach(r=>{ if(!ids.has(r.id)){ databank.push(r); ids.add(r.id); } });
+      localStorage.setItem('fmo_databank', JSON.stringify(databank));
+      renderHub(rows.concat(databank.filter(e=>!rows.find(r=>r.id===e.id))));
+      document.getElementById('hub-subtitle').textContent =
+        `🟢 Live · ${rows.length} obs from server`;
+    })
+    .catch(()=>{
+      document.getElementById('hub-subtitle').textContent = 'Server unreachable — showing local data';
+    });
 }
 
-function renderHub(){
-  const total = databank.length;
+function renderHub(data){
+  data = data || databank;
+  const total = data.length;
   document.getElementById('hub-total-badge').textContent = total + (total===1?' obs':' obs');
 
   // ── Global summary strip
   const sevCounts = {Critical:0, High:0, Medium:0, Low:0};
   const catCounts = {};
-  databank.forEach(e=>{
+  data.forEach(e=>{
     if(e.severity && sevCounts[e.severity] !== undefined) sevCounts[e.severity]++;
     if(e.waste_category) catCounts[e.waste_category] = (catCounts[e.waste_category]||0)+1;
   });
@@ -1299,10 +1341,10 @@ function renderHub(){
   const insightEl = document.getElementById('hub-insight');
   const insightTxt = document.getElementById('hub-insight-text');
   if(total > 0 && topCat){
-    const sitesWithData = [...new Set(databank.map(e=>e.site).filter(Boolean))];
+    const sitesWithData = [...new Set(data.map(e=>e.site).filter(Boolean))];
     const critPct = total ? Math.round(sevCounts.Critical*100/total) : 0;
     const insights = [];
-    if(sitesWithData.length === 1) insights.push(`All ${total} observations are from <strong>${sitesWithData[0]}</strong> — import more sites to compare.`);
+    if(sitesWithData.length === 1) insights.push(`All ${total} observations are from <strong>${sitesWithData[0]}</strong> — more sites sync in automatically.`);
     else insights.push(`<strong>${sitesWithData.length} sites</strong> active across NS Manual Atlas.`);
     if(critPct >= 20) insights.push(`⚠️ <strong>${critPct}%</strong> of observations are Critical — needs immediate attention.`);
     if(topCatInfo) insights.push(`<strong>${topCatInfo.icon} ${topCatInfo.k}</strong> is the #1 waste type (${topCat[1]} obs).`);
@@ -1314,7 +1356,7 @@ function renderHub(){
 
   // ── Per-site cards (sorted by obs count desc)
   const bysite = {};
-  databank.forEach(e=>{
+  data.forEach(e=>{
     const s = e.site || 'Unknown';
     if(!bysite[s]) bysite[s] = [];
     bysite[s].push(e);
@@ -1699,14 +1741,102 @@ function showShare(){
   show('s-share');
 }
 
-// ── Webhook ───────────────────────────────────────────────────────
-function saveWebhook(){
-  const url = document.getElementById('wh-url').value.trim();
-  if(!url){alert('Please paste the webhook URL.'); return;}
-  localStorage.setItem('fmo_webhook', url);
-  _shareInited = false; // force share screen to refresh QR + status badge
-  alert('✅ Webhook saved! Go to Share to get your pre-configured team link.');
+// ── Settings & Sync ──────────────────────────────────────────
+function getSyncUrl(){
+  return localStorage.getItem('fmo_sync_url') || '';
+}
+
+function saveSyncUrl(){
+  const url = document.getElementById('sync-url').value.trim().replace(/\/+$/, '');
+  if(!url){ alert('Please enter the server URL.'); return; }
+  localStorage.setItem('fmo_sync_url', url);
+  _setSyncBadge('saved');
+  _drainSyncQueue();
+}
+
+async function testSyncUrl(){
+  const url = document.getElementById('sync-url').value.trim().replace(/\/+$/, '');
+  if(!url){ alert('Enter a URL first.'); return; }
+  const msg = document.getElementById('sync-status-msg');
+  msg.textContent = '⏳ Testing…';
+  msg.style.color = '#64748b';
+  try {
+    const r = await fetch(`${url}/health`, {signal: AbortSignal.timeout(4000)});
+    const j = await r.json();
+    msg.textContent = j.status === 'OK' ? '✅ Connected!' : '⚠️ Server responded but not OK';
+    msg.style.color = j.status === 'OK' ? '#2a8703' : '#ea1100';
+  } catch {
+    msg.textContent = '❌ Cannot reach server — check URL and VPN/WiFi';
+    msg.style.color = '#ea1100';
+  }
+}
+
+function saveSettings(){
+  // Sync URL
+  const sUrl = document.getElementById('sync-url').value.trim().replace(/\/+$/, '');
+  if(sUrl) localStorage.setItem('fmo_sync_url', sUrl);
+  // Teams webhook
+  const wUrl = document.getElementById('wh-url').value.trim();
+  if(wUrl) localStorage.setItem('fmo_webhook', wUrl);
+  _shareInited = false;
+  _setSyncBadge('saved');
+  _drainSyncQueue();
+  alert('✅ Settings saved!');
   goHome();
+}
+
+function saveWebhook(){ saveSettings(); }
+
+function _setSyncBadge(state){
+  const el = document.getElementById('sync-home-badge');
+  if(!el) return;
+  if(state === 'on')  { el.style.display = 'block'; el.textContent = '🟢 Syncing to hub'; }
+  else if(state === 'off'){ el.style.display = 'block'; el.textContent = '⚪ Local only — set sync URL in ⚙️'; }
+  else if(state === 'saved'){ el.style.display = 'none'; }
+}
+
+/** POST one entry to the sync API. Returns true on success. */
+async function _syncEntry(entry){
+  const url = getSyncUrl();
+  if(!url) return false;
+  try {
+    const r = await fetch(`${url}/api/pwa/observations`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(entry),
+      signal: AbortSignal.timeout(6000),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+/** Drain retry queue — called on startup and after each submit. */
+async function _drainSyncQueue(){
+  const url = getSyncUrl();
+  if(!url) return;
+  const queue = JSON.parse(localStorage.getItem('fmo_sync_queue')||'[]');
+  if(!queue.length) return;
+  const failed = [];
+  for (const entry of queue){
+    const ok = await _syncEntry(entry);
+    if(!ok) failed.push(entry);
+  }
+  localStorage.setItem('fmo_sync_queue', JSON.stringify(failed));
+}
+
+/** Push entry to API; if it fails, queue for retry. */
+async function syncObservation(entry){
+  const ok = await _syncEntry(entry);
+  if(!ok){
+    const q = JSON.parse(localStorage.getItem('fmo_sync_queue')||'[]');
+    if(!q.find(e=>e.id===entry.id)) q.push(entry);
+    localStorage.setItem('fmo_sync_queue', JSON.stringify(q));
+  }
+  _updateSyncBadgeFromState();
+}
+
+function _updateSyncBadgeFromState(){
+  _setSyncBadge(getSyncUrl() ? 'on' : 'off');
 }
 
 // ── Misc ────────────────────────────────────────
@@ -1724,19 +1854,31 @@ function startObs(){
 (function init(){
   buildSiteSelect();
   buildPathSelects();
-  buildHomeSiteGrid(); // render site tiles immediately
+  buildHomeSiteGrid();
 
-  // Auto-seed webhook from ?webhook= URL param so manager can share a pre-configured link
+  // Load saved sync + webhook URLs into settings form
+  const savedSync = localStorage.getItem('fmo_sync_url');
+  if(savedSync){ const el = document.getElementById('sync-url'); if(el) el.value = savedSync; }
+  const savedWH = localStorage.getItem('fmo_webhook');
+  if(savedWH){ const el = document.getElementById('wh-url'); if(el) el.value = savedWH; }
+
+  _updateSyncBadgeFromState();
+  _drainSyncQueue(); // retry any queued observations from previous sessions
+
+  // Auto-seed webhook/sync URL from query params (for manager-shared links)
   const params = new URLSearchParams(location.search);
-  const paramWH = params.get('webhook');
+  const paramWH   = params.get('webhook');
+  const paramSync = params.get('sync');
   if(paramWH && paramWH.startsWith('https://')){
     localStorage.setItem('fmo_webhook', paramWH);
-    document.getElementById('wh-url').value = paramWH;
-    // Remove param from address bar without reloading (don't expose in browser history)
+    const el = document.getElementById('wh-url'); if(el) el.value = paramWH;
     history.replaceState(null, '', location.pathname);
-  } else {
-    const saved = localStorage.getItem('fmo_webhook');
-    if(saved) document.getElementById('wh-url').value = saved;
+  }
+  if(paramSync && paramSync.startsWith('http')){
+    localStorage.setItem('fmo_sync_url', paramSync);
+    const el = document.getElementById('sync-url'); if(el) el.value = paramSync;
+    history.replaceState(null, '', location.pathname);
+    _updateSyncBadgeFromState();
   }
 
   loadIdentity();

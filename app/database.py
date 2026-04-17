@@ -16,7 +16,8 @@ WASTE_CATEGORIES = [
     "Waiting",
     "Overproduction",
     "Over-processing",
-    "Defects"
+    "Defects",
+    "Safety",
 ]
 
 # Severity to RPN multiplier
@@ -101,8 +102,9 @@ def init_db():
                 observed_by TEXT,
                 observed_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (step_id) REFERENCES process_steps(id) ON DELETE CASCADE,
-                CHECK (waste_category IN ('Transportation', 'Inventory', 'Motion', 
-                                          'Waiting', 'Overproduction', 'Over-processing', 'Defects')),
+                CHECK (waste_category IN ('Transportation', 'Inventory', 'Motion',
+                                          'Waiting', 'Overproduction', 'Over-processing',
+                                          'Defects', 'Safety')),
                 CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
                 CHECK (status IN ('Open', 'In Progress', 'Resolved', 'Closed'))
             )
@@ -152,6 +154,25 @@ def init_db():
         except Exception:
             pass  # Column already exists — sqlite3 raises OperationalError, not a problem
 
+        # ── PWA observations (raw sync from atlas-fmo PWA) ──────────────
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pwa_observations (
+                id            INTEGER PRIMARY KEY,
+                observer      TEXT,
+                site          TEXT,
+                shift         TEXT,
+                process_path  TEXT,
+                observer_area TEXT,
+                waste_category TEXT,
+                title         TEXT NOT NULL,
+                description   TEXT,
+                severity      TEXT,
+                timestamp     TEXT,
+                observation_duration_seconds INTEGER,
+                received_at   TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_paths_site ON process_paths(site_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_steps_path ON process_steps(path_id)")
@@ -159,9 +180,60 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_observations_category ON waste_observations(waste_category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_comments_observation ON comments(observation_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_failure_modes_obs ON failure_modes(observation_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pwa_site ON pwa_observations(site)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pwa_ts   ON pwa_observations(timestamp)")
+
+    # Run after the main with-block so it gets its own connection
+    _migrate_waste_category_safety()
 
 
-# ── SITES ────────────────────────────────────────────────────────
+def _migrate_waste_category_safety():
+    """Recreate waste_observations with Safety in the CHECK constraint if needed.
+    SQLite doesn't support ALTER TABLE … MODIFY CONSTRAINT, so we use the
+    standard rename-copy-drop-rename pattern.  Idempotent.
+    """
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='waste_observations'"
+        ).fetchone()
+        if row and "'Safety'" in row[0]:
+            return  # already migrated
+        conn.execute("PRAGMA foreign_keys=OFF")
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS waste_observations_v2 (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                step_id     INTEGER NOT NULL,
+                waste_category TEXT NOT NULL,
+                title       TEXT NOT NULL,
+                description TEXT,
+                severity    TEXT DEFAULT 'Medium',
+                status      TEXT DEFAULT 'Open',
+                observed_by TEXT,
+                observed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                observation_duration_seconds INTEGER DEFAULT NULL,
+                FOREIGN KEY (step_id) REFERENCES process_steps(id) ON DELETE CASCADE,
+                CHECK (waste_category IN ('Transportation','Inventory','Motion',
+                                         'Waiting','Overproduction','Over-processing',
+                                         'Defects','Safety')),
+                CHECK (severity IN ('Low','Medium','High','Critical')),
+                CHECK (status IN ('Open','In Progress','Resolved','Closed'))
+            );
+            INSERT INTO waste_observations_v2
+                SELECT id, step_id, waste_category, title, description,
+                       severity, status, observed_by, observed_at,
+                       observation_duration_seconds
+                FROM   waste_observations;
+            DROP TABLE waste_observations;
+            ALTER TABLE waste_observations_v2 RENAME TO waste_observations;
+            CREATE INDEX IF NOT EXISTS idx_observations_step
+                ON waste_observations(step_id);
+            CREATE INDEX IF NOT EXISTS idx_observations_category
+                ON waste_observations(waste_category);
+        """)
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
+# ── SITES ──────────────────────────────────────────────────────────────
 def get_all_sites() -> List[Dict[str, Any]]:
     with get_db() as conn:
         cursor = conn.cursor()
@@ -662,7 +734,7 @@ _COL_MAP = {
 
 _VALID_CATEGORIES = {
     "transportation", "inventory", "motion", "waiting",
-    "overproduction", "over-processing", "defects",
+    "overproduction", "over-processing", "defects", "safety",
 }
 _VALID_SEVERITIES = {"low", "medium", "high", "critical"}
 
@@ -702,7 +774,8 @@ def import_from_forms_csv(csv_bytes: bytes) -> Tuple[int, int, List[str]]:
             # Try to fuzzy-match first letter
             letter = cat[0].upper() if cat else ""
             letter_map = {"T": "Transportation", "I": "Inventory", "M": "Motion",
-                          "W": "Waiting", "O": "Overproduction", "D": "Defects"}
+                          "W": "Waiting", "O": "Overproduction", "D": "Defects",
+                          "S": "Safety"}
             cat = letter_map.get(letter, "Waiting")
         else:
             # Normalize capitalisation
@@ -765,3 +838,50 @@ def get_path_details(path_id: int) -> Optional[Dict[str, Any]]:
                     obs['failure_mode'] = fm
         
         return path
+
+
+# ── PWA OBSERVATIONS (atlas-fmo sync) ────────────────────────────────
+
+def upsert_pwa_observation(entry: Dict[str, Any]) -> bool:
+    """Insert or replace a PWA observation. Returns True if it was new."""
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT id FROM pwa_observations WHERE id=?", (entry["id"],)
+        ).fetchone()
+        conn.execute("""
+            INSERT OR REPLACE INTO pwa_observations
+                (id, observer, site, shift, process_path, observer_area,
+                 waste_category, title, description, severity, timestamp,
+                 observation_duration_seconds)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            entry.get("id"),
+            entry.get("observer", "Anonymous"),
+            entry.get("site", ""),
+            entry.get("shift", ""),
+            entry.get("process_path", ""),
+            entry.get("observer_area", ""),
+            entry.get("waste_category", ""),
+            entry.get("title", ""),
+            entry.get("description", ""),
+            entry.get("severity", "Medium"),
+            entry.get("timestamp"),
+            entry.get("observation_duration_seconds"),
+        ))
+        return existing is None
+
+
+def get_pwa_observations(site: Optional[str] = None, limit: int = 1000) -> List[Dict[str, Any]]:
+    """Fetch PWA observations, newest first."""
+    with get_db() as conn:
+        if site:
+            rows = conn.execute(
+                "SELECT * FROM pwa_observations WHERE site=? ORDER BY timestamp DESC LIMIT ?",
+                (site, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM pwa_observations ORDER BY timestamp DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
