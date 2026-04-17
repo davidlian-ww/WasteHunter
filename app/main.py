@@ -42,6 +42,7 @@ from app.database import (
     start_study, get_study, get_study_observations, log_fmo_in_study, end_study,
     get_all_studies, get_studies_stats,
     get_bank_observations, get_bank_stats,
+    delete_observation, bulk_delete_observations,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -744,6 +745,39 @@ async def bank_export(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="bank_export.csv"'},
     )
+
+
+@app.delete("/bank/delete/{obs_id}", response_class=HTMLResponse)
+async def bank_delete_one(obs_id: int):
+    """Hard-delete a single observation. Returns an empty 200 so HTMX removes the row."""
+    delete_observation(obs_id)
+    return HTMLResponse("", status_code=200)
+
+
+@app.post("/bank/bulk-delete", response_class=HTMLResponse)
+async def bank_bulk_delete(
+    request:     Request,
+    before_date: str          = Form(""),
+    source:      str          = Form(""),
+):
+    """Bulk hard-delete observations by date and/or source."""
+    if not before_date and not source:
+        return HTMLResponse(
+            '<p class="text-red-600 font-semibold text-sm">⚠️ Set a date or source first.</p>',
+            status_code=400,
+        )
+    deleted = bulk_delete_observations(
+        before_date=before_date or None,
+        source=source or None,
+    )
+    stats = get_bank_stats()
+    return templates.TemplateResponse(request, "components/bank_upload_result.html", {
+        "imported": 0,
+        "skipped":  0,
+        "errors":   [],
+        "deleted":  deleted,
+        "stats":    stats,
+    })
 
 
 # ── STUDY SESSION ROUTES ──────────────────────────────────────────────────────

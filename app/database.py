@@ -1248,3 +1248,43 @@ def get_bank_stats() -> Dict[str, Any]:
             "oldest":     date_range["oldest"] or "—",
             "newest":     date_range["newest"] or "—",
         }
+
+
+def delete_observation(obs_id: int) -> bool:
+    """Hard-delete a single waste observation (cascades to FMA + comments).
+    Returns True if a row was actually deleted.
+    """
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM waste_observations WHERE id = ?", (obs_id,)
+        )
+        return cur.rowcount > 0
+
+
+def bulk_delete_observations(
+    before_date: Optional[str] = None,   # YYYY-MM-DD  — delete observed_at < this
+    source: Optional[str] = None,        # restrict to one source tag
+) -> int:
+    """Bulk hard-delete observations matching the given criteria.
+    At least one filter is required (safety guard — won't wipe everything).
+    Returns the number of rows deleted.
+    """
+    if not before_date and not source:
+        raise ValueError("Supply at least before_date or source to bulk-delete.")
+
+    clauses: List[str] = []
+    params:  List[Any] = []
+
+    if before_date:
+        clauses.append("DATE(observed_at) < ?")
+        params.append(before_date)
+    if source and source != "all":
+        clauses.append("COALESCE(source,'live') = ?")
+        params.append(source)
+
+    where = "WHERE " + " AND ".join(clauses)
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM waste_observations {where}", params
+        )
+        return cur.rowcount

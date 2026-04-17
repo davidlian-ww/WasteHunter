@@ -1,4 +1,13 @@
-{# HTMX partial: result of a CSV upload or manual entry to the bank #}
+{# HTMX partial: result of a CSV upload, manual entry, or bulk delete #}
+{% if deleted is defined and deleted %}
+<div class="rounded-lg p-4 border" style="background:#fef2f2;border-color:#ea1100">
+  <div class="font-bold text-red-800 mb-1">🗑️ {{ deleted }} record{{ 's' if deleted != 1 else '' }} deleted</div>
+  <div class="text-sm text-red-700">
+    Bank now holds <strong>{{ stats.total }}</strong> observations.
+    <a href="/bank" class="underline font-semibold">Refresh the table →</a>
+  </div>
+</div>
+{% endif %}
 {% if imported %}
 <div class="rounded-lg p-4 border" style="background:#f0fdf4;border-color:#2a8703">
   <div class="font-bold text-green-800 mb-1">✅ {{ imported }} record{{ 's' if imported != 1 else '' }} added to the bank</div>
