@@ -1,12 +1,16 @@
 """Database setup and models for TIMWOOD Waste Dashboard with FMA Analysis"""
 import csv
 import io
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, List, Any, Tuple
 
-DB_PATH = "timwood.db"
+# DATA_DIR lets Render (or any host) point the DB at a persistent disk.
+# Locally it falls back to the project directory.
+_data_dir = os.environ.get("DATA_DIR", "")
+DB_PATH = os.path.join(_data_dir, "timwood.db") if _data_dir else "timwood.db"
 
 # TIMWOOD waste categories
 WASTE_CATEGORIES = [

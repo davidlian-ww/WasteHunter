@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: waster-hunter
+    runtime: python
+    region: oregon
+    plan: starter           # $7/mo — required for persistent disk
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATA_DIR
+        value: /data         # persistent disk mount point
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    disk:
+      name: waster-hunter-db
+      mountPath: /data
+      sizeGB: 1              # $0.25/mo — holds the SQLite file
+
+  # ── Optional: add environment variables below ───────────────────
+  # - key: SHAREPOINT_FORM_URL
+  #   value: https://forms.office.com/...

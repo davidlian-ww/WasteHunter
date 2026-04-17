@@ -14,6 +14,8 @@ import base64
 import io
 import qrcode
 import threading
+from dotenv import load_dotenv
+load_dotenv()  # picks up .env if present; no-op on Render where env vars are set directly
 from app.ns_seeder import seed_ns_sites
 
 from app.sharepoint_sync import (

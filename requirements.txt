@@ -1,4 +1,10 @@
-fastapi
-uvicorn[standard]
-jinja2
-python-multipart
+fastapi==0.135.3
+uvicorn[standard]==0.44.0
+jinja2==3.1.6
+python-multipart==0.0.24
+qrcode[pil]==8.2
+pillow==12.2.0
+msal==1.35.1
+requests==2.33.1
+python-dotenv==1.2.2
+pydantic==2.12.5
