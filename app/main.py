@@ -40,6 +40,7 @@ from app.database import (
     quick_log_observation, get_all_process_path_names, get_recent_observations,
     import_from_forms_csv, upsert_pwa_observation, get_pwa_observations,
     start_study, get_study, get_study_observations, log_fmo_in_study, end_study,
+    get_all_studies, get_studies_stats,
 )
 
 app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
@@ -630,7 +631,24 @@ async def get_fma_data():
     return get_fma_analytics()
 
 
-# ── STUDY SESSION ROUTES ────────────────────────────────────────────
+# ── STUDY SESSION ROUTES ──────────────────────────────────────────────────
+
+@app.get("/studies", response_class=HTMLResponse)
+async def studies_list(request: Request,
+                        status: Optional[str] = None,
+                        path: Optional[str] = None,
+                        observer: Optional[str] = None):
+    """All FMO study sessions from all users, filterable."""
+    studies  = get_all_studies(status=status, path_name=path, observer=observer)
+    agg      = get_studies_stats()
+    return templates.TemplateResponse(request, "studies.html", {
+        "studies":  studies,
+        "agg":      agg,
+        "filter_status":   status   or "",
+        "filter_path":     path     or "",
+        "filter_observer": observer or "",
+    })
+
 
 @app.post("/study/start", response_class=HTMLResponse)
 async def study_start(

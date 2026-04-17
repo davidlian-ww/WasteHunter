@@ -1088,3 +1088,47 @@ def end_study(session_id: int) -> Dict[str, Any]:
             "fmo_count":          fmo_count,
             "by_category":        [dict(r) for r in cats],
         }
+
+
+def get_all_studies(
+    status: Optional[str] = None,
+    path_name: Optional[str] = None,
+    observer: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """List all study sessions, newest first, with optional filters."""
+    with get_db() as conn:
+        clauses, params = [], []
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        if path_name:
+            clauses.append("path_name LIKE ?")
+            params.append(f"%{path_name}%")
+        if observer:
+            clauses.append("observer LIKE ?")
+            params.append(f"%{observer}%")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        rows = conn.execute(
+            f"SELECT * FROM study_sessions {where} ORDER BY started_at DESC",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_studies_stats() -> Dict[str, Any]:
+    """Aggregate KPIs across all completed studies."""
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*)                          AS total_studies,
+                COUNT(CASE WHEN status='active' THEN 1 END) AS active_studies,
+                COALESCE(SUM(total_waste_seconds), 0)   AS total_waste_seconds,
+                COALESCE(SUM(total_wall_seconds), 0)    AS total_wall_seconds,
+                COALESCE(SUM(fmo_count), 0)             AS total_fmos,
+                COUNT(DISTINCT observer)                AS unique_observers,
+                COUNT(DISTINCT path_name)               AS unique_paths
+            FROM study_sessions
+            """
+        ).fetchone()
+        return dict(row)
