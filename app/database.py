@@ -334,12 +334,15 @@ def _remove_ns_seeded_data() -> None:
         c = conn.cursor()
         c.execute("DELETE FROM process_paths WHERE created_by = 'NS Seeder'")
         paths_removed = c.rowcount
-        # Remove sites that now have zero paths (orphaned NS sites)
-        c.execute("""
-            DELETE FROM sites
-            WHERE id NOT IN (SELECT DISTINCT site_id FROM process_paths)
-        """)
-        sites_removed = c.rowcount
+        # Only clean up orphaned sites if we actually deleted seeded paths.
+        # Guarding here prevents wiping user sites when process_paths is empty.
+        sites_removed = 0
+        if paths_removed > 0:
+            c.execute("""
+                DELETE FROM sites
+                WHERE id NOT IN (SELECT DISTINCT site_id FROM process_paths)
+            """)
+            sites_removed = c.rowcount
         if paths_removed or sites_removed:
             log.info(
                 "NS seeder cleanup: removed %d paths and %d orphaned sites.",
