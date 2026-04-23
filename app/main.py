@@ -16,7 +16,6 @@ import qrcode
 import threading
 from dotenv import load_dotenv
 load_dotenv()  # picks up .env if present; no-op on Render where env vars are set directly
-from app.ns_seeder import seed_ns_sites
 
 from app.sharepoint_sync import (
     sync_from_sharepoint, sync_from_teams, import_from_json_export,
@@ -63,7 +62,6 @@ templates = Jinja2Templates(directory="app/templates")
 @app.on_event("startup")
 async def startup():
     init_db()
-    seed_ns_sites()
 
 
 @app.get("/health")

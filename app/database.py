@@ -1,11 +1,14 @@
 """Database setup and models for TIMWOOD Waste Dashboard with FMA Analysis"""
 import csv
 import io
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, List, Any, Tuple
+
+log = logging.getLogger(__name__)
 
 # DATA_DIR lets Render (or any host) point the DB at a persistent disk.
 # Locally it falls back to the project directory.
@@ -220,6 +223,7 @@ def init_db():
     _migrate_waste_category_safety()
     _migrate_study_session_id()
     _migrate_source_column()
+    _remove_ns_seeded_data()
 
 
 def _migrate_source_column():
@@ -313,6 +317,34 @@ def _migrate_waste_category_safety():
                 ON waste_observations(waste_category);
         """)
         conn.execute("PRAGMA foreign_keys=ON")
+
+
+def _remove_ns_seeded_data() -> None:
+    """One-time cleanup: delete all process paths stamped by the NS seeder
+    and any orphaned sites that have no remaining paths.
+
+    Idempotent — safe to call on every startup.  Once the seeded rows are
+    gone this function is a fast no-op.  User-created paths and sites are
+    never touched (they carry a different created_by value or have paths
+    attached after cleanup).
+    """
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        # Remove NS-seeder paths (CASCADE deletes their steps + observations)
+        c = conn.cursor()
+        c.execute("DELETE FROM process_paths WHERE created_by = 'NS Seeder'")
+        paths_removed = c.rowcount
+        # Remove sites that now have zero paths (orphaned NS sites)
+        c.execute("""
+            DELETE FROM sites
+            WHERE id NOT IN (SELECT DISTINCT site_id FROM process_paths)
+        """)
+        sites_removed = c.rowcount
+        if paths_removed or sites_removed:
+            log.info(
+                "NS seeder cleanup: removed %d paths and %d orphaned sites.",
+                paths_removed, sites_removed,
+            )
 
 
 # ── SITES ──────────────────────────────────────────────────────────────

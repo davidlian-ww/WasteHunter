@@ -6,7 +6,7 @@
     <div class="flex justify-between items-center">
         <div>
             <h1 class="text-3xl font-bold text-gray-900">Process Paths</h1>
-            <p class="text-gray-600 mt-1">Create and manage process flows for waste analysis</p>
+            <p class="text-gray-600 mt-1">Define the process flows you want to study for TIMWOODIS waste</p>
         </div>
         <button 
             onclick="document.getElementById('createPathModal').classList.remove('hidden')"
@@ -67,10 +67,26 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-16">
+        <div class="text-center py-16 px-6">
             <div class="text-6xl mb-4">🛤️</div>
-            <h3 class="text-xl font-bold text-gray-900 mb-2">No Process Paths Yet</h3>
-            <p class="text-gray-600">Create your first process path to start tracking waste!</p>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Process Paths Yet — Create Yours!</h3>
+            <p class="text-gray-500 max-w-sm mx-auto mb-6">
+                A process path is a flow of steps you want to study for waste.
+                Examples: <em>Inbound Receiving</em>, <em>Pick & Pack</em>, <em>Outbound Loading</em>.
+            </p>
+            {% if not sites %}
+            <p class="text-sm text-[#ea1100] font-semibold mb-4">⚠️ Add a Site first before creating a process path.</p>
+            <a href="/sites"
+               class="inline-flex items-center gap-2 bg-[#0053e2] hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow transition">
+                🏗️ Go Add a Site
+            </a>
+            {% else %}
+            <button
+                onclick="document.getElementById('createPathModal').classList.remove('hidden')"
+                class="inline-flex items-center gap-2 bg-[#2a8703] hover:bg-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow transition">
+                + Create Your First Process Path
+            </button>
+            {% endif %}
         </div>
         {% endif %}
     </div>
