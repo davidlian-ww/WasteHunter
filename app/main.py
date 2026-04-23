@@ -47,7 +47,7 @@ from app.database import (
     delete_observation, bulk_delete_observations,
 )
 
-app = FastAPI(title="TIMWOOD Failure Mode Analysis Dashboard")
+app = FastAPI(title="TIMWOODIS Failure Mode Analysis Dashboard")
 
 # Allow the atlas-fmo PWA (any origin on Eagle WiFi) to POST observations
 app.add_middleware(
@@ -666,7 +666,7 @@ async def bank_page(
         "f_date_to":    date_to  or "",
         "waste_categories": [
             "Transportation","Inventory","Motion","Waiting",
-            "Overproduction","Over-processing","Defects","Safety",
+            "Overproduction","Over-processing","Defects","Intellectual","Safety",
         ],
     })
 
@@ -909,7 +909,7 @@ async def study_summary_page(request: Request, session_id: int):
         "colors": [
             {"Transportation":"#dc2626","Inventory":"#ea580c","Motion":"#ca8a04",
              "Waiting":"#0053e2","Overproduction":"#7c3aed","Over-processing":"#0891b2",
-             "Defects":"#dc2626","Safety":"#2a8703"}.get(c, "#6b7280")
+             "Defects":"#dc2626","Intellectual":"#be185d","Safety":"#2a8703"}.get(c, "#6b7280")
             for c, _ in sorted_cats
         ],
     })

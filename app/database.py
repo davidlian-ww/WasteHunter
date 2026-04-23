@@ -21,6 +21,7 @@ WASTE_CATEGORIES = [
     "Overproduction",
     "Over-processing",
     "Defects",
+    "Intellectual",
     "Safety",
 ]
 
@@ -108,7 +109,7 @@ def init_db():
                 FOREIGN KEY (step_id) REFERENCES process_steps(id) ON DELETE CASCADE,
                 CHECK (waste_category IN ('Transportation', 'Inventory', 'Motion',
                                           'Waiting', 'Overproduction', 'Over-processing',
-                                          'Defects', 'Safety')),
+                                          'Defects', 'Intellectual', 'Safety')),
                 CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
                 CHECK (status IN ('Open', 'In Progress', 'Resolved', 'Closed'))
             )
@@ -295,7 +296,7 @@ def _migrate_waste_category_safety():
                 FOREIGN KEY (step_id) REFERENCES process_steps(id) ON DELETE CASCADE,
                 CHECK (waste_category IN ('Transportation','Inventory','Motion',
                                          'Waiting','Overproduction','Over-processing',
-                                         'Defects','Safety')),
+                                         'Defects','Intellectual','Safety')),
                 CHECK (severity IN ('Low','Medium','High','Critical')),
                 CHECK (status IN ('Open','In Progress','Resolved','Closed'))
             );

@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FMO Audit">
 <meta name="application-name" content="FMO Audit">
-<meta name="description" content="Walmart NS FC — log TIMWOOD waste observations on the floor">
+<meta name="description" content="Walmart NS FC — log TIMWOODIS waste observations on the floor">
 <meta name="theme-color" content="#0053e2">
 <link id="pwa-icon" rel="apple-touch-icon">
 <title>FMO Audit — NS FC</title>
@@ -360,7 +360,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 <div id="s-category" class="screen">
   <div class="hdr">
     <div class="hdr-top"><span class="hdr-brand">New Observation</span></div>
-    <h1>Spotted Waste?</h1><p id="cat-path-label">Select the TIMWOOD category — timer starts now</p>
+    <h1>Spotted Waste?</h1><p id="cat-path-label">Select the TIMWOODIS category — timer starts now</p>
   </div>
   <div class="steps" id="steps-cat">
     <div class="step active"></div><div class="step"></div>
@@ -471,7 +471,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
           <option>Transportation</option><option>Inventory</option>
           <option>Motion</option><option>Waiting</option>
           <option>Overproduction</option><option>Over-processing</option>
-          <option>Defects</option>
+          <option>Defects</option><option>Intellectual</option>
+          <option>Safety</option>
         </select>
         <select id="db-filter-sev" onchange="renderBank()"
           style="flex:1;padding:8px;border:2px solid #e2e8f0;border-radius:10px;
@@ -805,7 +806,8 @@ const CATS = [
   {k:'Overproduction', icon:'📈', color:'#7c3aed', grad:'linear-gradient(135deg,#f5f3ff,#ddd6fe)', desc:'More than needed or early'},
   {k:'Over-processing',icon:'⚙️',  color:'#0891b2', grad:'linear-gradient(135deg,#ecfeff,#a5f3fc)', desc:'Unnecessary extra work'},
   {k:'Defects',        icon:'⚠️',  color:'#ea1100', grad:'linear-gradient(135deg,#fef2f2,#fecaca)', desc:'Errors needing rework'},
-  {k:'Safety',         icon:'🦺', color:'#2a8703', grad:'linear-gradient(135deg,#f0fdf4,#bbf7d0)', desc:'Hazards & unsafe conditions'},
+  {k:'Intellectual',   icon:'🧠', color:'#be185d', grad:'linear-gradient(135deg,#fdf4ff,#fce7f3)', desc:'Underutilised knowledge & ideas'},
+  {k:'Safety',         icon:'🦿', color:'#2a8703', grad:'linear-gradient(135deg,#f0fdf4,#bbf7d0)', desc:'Hazards & unsafe conditions'},
 ];
 const SEVS = [
   {k:'Low',      icon:'🟢', color:'#2a8703', bg:'#f0fdf4', desc:'Minor — note &amp; monitor'},
@@ -1622,7 +1624,7 @@ function buildTeamURL(){
   const manifest = {
     name: 'FMO Audit — NS FC',
     short_name: 'FMO Audit',
-    description: 'Walmart Non-Sort FC — TIMWOOD waste observation tool',
+    description: 'Walmart Non-Sort FC — TIMWOODIS waste observation tool',
     start_url: APP_URL,
     display: 'standalone',
     orientation: 'portrait',
@@ -1665,8 +1667,8 @@ async function nativeShare(){
   const data = {
     title: 'FMO Audit — NS FC',
     text: hasWH
-      ? 'Log TIMWOOD waste — opens ready with Teams alerts. No setup needed.'
-      : 'Log TIMWOOD waste observations on the floor. Works offline, no login needed.',
+      ? 'Log TIMWOODIS waste — opens ready with Teams alerts. No setup needed.'
+      : 'Log TIMWOODIS waste observations on the floor. Works offline, no login needed.',
     url: teamURL,
   };
   if(navigator.share && navigator.canShare && navigator.canShare(data)){
