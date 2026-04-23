@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}About TIMWOODIS — Waste Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-14">
+
+  {# ── HERO ─────────────────────────────────────────────────────────── #}
+  <div class="rounded-2xl text-white text-center relative overflow-hidden"
+       style="background:linear-gradient(135deg,#0053e2 0%,#003db5 55%,#1a1a5e 100%);padding:4rem 2rem">
+    <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;
+                border-radius:50%;background:rgba(255,194,32,.10)"></div>
+    <div style="position:absolute;bottom:-60px;left:-60px;width:200px;height:200px;
+                border-radius:50%;background:rgba(255,255,255,.06)"></div>
+    <div style="position:absolute;top:30px;left:60px;width:80px;height:80px;
+                border-radius:50%;background:rgba(255,194,32,.07)"></div>
+
+    <div class="relative" style="z-index:1">
+      <span class="inline-block px-4 py-1.5 rounded-full text-sm font-bold mb-6"
+            style="background:rgba(255,194,32,.2);color:#ffc220;border:1px solid rgba(255,194,32,.35)">
+        📖 Lean Manufacturing Framework
+      </span>
+
+      <h1 class="font-black mb-4" style="font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.02em">
+        What is <span style="color:#ffc220">TIMWOODIS</span>?
+      </h1>
+      <p class="mb-10 mx-auto" style="max-width:600px;font-size:1.1rem;opacity:.85;line-height:1.7">
+        A proven lean framework for spotting and eliminating the <strong>9 forms of operational waste</strong>
+        in fulfillment centres — driving efficiency, safety, and continuous improvement.
+      </p>
+
+      {# Letter tiles #}
+      <div class="flex flex-wrap justify-center gap-3">
+        {% set letters = [
+          ('T','🚛','#dc2626'),('I','📦','#ea580c'),('M','🚶','#ca8a04'),
+          ('W','⏱️','#0053e2'),('O','📈','#7c3aed'),('O','⚙️','#0891b2'),
+          ('D','❌','#ea1100'),('I','🧠','#be185d'),('S','🦺','#2a8703')
+        ] %}
+        {% for letter, icon, color in letters %}
+        <div class="flex flex-col items-center rounded-xl font-black"
+             style="background:rgba(255,255,255,.13);border:2px solid rgba(255,255,255,.22);
+                    padding:.9rem .75rem;min-width:52px;backdrop-filter:blur(4px)">
+          <span style="font-size:1.4rem">{{ icon }}</span>
+          <span style="font-size:1.5rem;color:{{ color }};text-shadow:0 0 12px rgba(0,0,0,.4);margin-top:2px">
+            {{ letter }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── THE 9 PILLARS ────────────────────────────────────────────────── #}
+  <div>
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-black text-gray-900">The 9 Pillars of TIMWOODIS</h2>
+      <p class="text-gray-500 mt-2">Every letter is a category of waste you can observe, log, and eliminate</p>
+    </div>
+
+    {% set pillars = [
+      ('T','Transportation','🚛','#dc2626','#fef2f2',
+       'Unnecessary movement of products, materials, or information between locations. '
+       'Every extra truck move, pallet drag, or conveyor re-route that adds no customer value.'),
+      ('I','Inventory','📦','#ea580c','#fff7ed',
+       'Excess stock, WIP, or supplies beyond what is immediately needed. '
+       'Inventory hides problems, consumes space, and ties up capital.'),
+      ('M','Motion','🚶','#ca8a04','#fefce8',
+       'Unnecessary physical movement by people — reaching, walking, bending, searching. '
+       'Ergonomic and layout design eliminate motion waste at the source.'),
+      ('W','Waiting','⏱️','#0053e2','#eff6ff',
+       'Idle time when a person, machine, or item is waiting for the next step. '
+       'Waiting is a signal that upstream processes are out of balance.'),
+      ('O','Overproduction','📈','#7c3aed','#f5f3ff',
+       'Producing more than the customer needs, or producing it earlier than needed. '
+       'The most dangerous waste — it creates and masks all other wastes.'),
+      ('O','Over-processing','⚙️','#0891b2','#ecfeff',
+       'Doing more work, adding more precision, or using more process steps than the customer requires. '
+       'Gold-plating, redundant approvals, and unnecessary re-checks are classic examples.'),
+      ('D','Defects','❌','#ea1100','#fff1f2',
+       'Work that is incorrect, incomplete, or requires rework. Defects consume resources twice '
+       '— once to produce the error and again to fix it. Prevention beats inspection every time.'),
+      ('I','Intellectual','🧠','#be185d','#fdf2f8',
+       'Underutilising the knowledge, skills, creativity, and ideas of your people. '
+       'Not listening to frontline associates is one of the most expensive wastes of all.'),
+      ('S','Safety','🦺','#2a8703','#f0fdf4',
+       'Hazards, near-misses, unsafe acts, and unsafe conditions. Safety waste leads to '
+       'injuries, investigations, lost time, and eroded trust — and is always preventable.'),
+    ] %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {% for letter, name, icon, color, bg, desc in pillars %}
+      <div class="rounded-xl p-6 border-l-4 shadow-sm hover:shadow-md transition"
+           style="background:{{ bg }};border-left-color:{{ color }}">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-black text-white shadow-sm flex-shrink-0"
+               style="background:{{ color }}">
+            {{ icon }}
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase tracking-widest" style="color:{{ color }}">
+              {{ letter }} — {{ loop.index }}{% if loop.index == 1 %}st{% elif loop.index == 2 %}nd{% elif loop.index == 3 %}rd{% else %}th{% endif %} waste
+            </div>
+            <div class="text-lg font-black text-gray-900">{{ name }}</div>
+          </div>
+        </div>
+        <p class="text-sm text-gray-700 leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── ORIGIN STORY ─────────────────────────────────────────────────── #}
+  <div class="rounded-2xl overflow-hidden shadow-md">
+    <div class="px-8 py-6 text-white"
+         style="background:linear-gradient(135deg,#1a1a5e,#0053e2)">
+      <h2 class="text-2xl font-black">🏭 Where Did It Come From?</h2>
+      <p class="text-blue-200 mt-1 text-sm">From a Japanese factory floor to your FC</p>
+    </div>
+
+    <div class="bg-white p-8">
+      <div class="relative">
+        {# Vertical line #}
+        <div class="absolute left-6 top-0 bottom-0 w-0.5" style="background:#e2e8f0"></div>
+
+        {% set timeline = [
+          ('1950s','🇯🇵','Toyota Production System',
+           'Taiichi Ohno, an engineer at Toyota, identifies 7 forms of waste — called <em>Muda</em> '
+           'in Japanese. His goal: build cars with zero wasted effort, material, or time. '
+           'The 7 wastes are Transportation, Inventory, Motion, Waiting, '
+           'Overproduction, Over-processing, and Defects.','#0053e2'),
+          ('1990s','🌎','Lean Goes Global',
+           'James Womack and Daniel Jones publish <em>The Machine That Changed the World</em> (1990) '
+           'and <em>Lean Thinking</em> (1996), bringing the Toyota system to Western manufacturing '
+           'and logistics. TIMWOOD becomes the standard mnemonic used in lean training worldwide.','#7c3aed'),
+          ('2000s','🦺','Safety Joins the Framework',
+           'Organisations — especially in logistics and warehousing — recognise that Safety '
+           'is a critical, standalone waste category. Unsafe conditions cause lost time, '
+           'investigations, and human cost that no efficiency gain can offset. '
+           'TIMWOOD becomes <strong>TIMWOODS</strong>.','#2a8703'),
+          ('2010s','🧠','The Intellectual Waste Debate',
+           'Lean practitioners increasingly highlight the "8th waste" — underutilised talent. '
+           'If your frontline team has ideas to fix problems and nobody asks, that knowledge '
+           'is pure waste. The concept is formalised across industries as <em>Intellectual</em> waste.','#be185d'),
+          ('Today','⭐','TIMWOODIS at Walmart NS FCs',
+           'Our Non-Sort Fulfillment Centers adopt <strong>TIMWOODIS</strong> as the complete '
+           'framework — nine pillars covering every dimension of waste including the knowledge '
+           'and ideas of every single associate on the floor. This dashboard tracks them all.','#ffc220'),
+        ] %}
+
+        <div class="space-y-8 pl-16">
+          {% for era, flag, title, body, color in timeline %}
+          <div class="relative">
+            {# Dot #}
+            <div class="absolute -left-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white shadow"
+                 style="background:{{ color }};top:2px">
+              {{ flag }}
+            </div>
+            <div class="inline-block px-3 py-1 rounded-full text-xs font-bold mb-1"
+                 style="background:{{ color }}22;color:{{ color }}">
+              {{ era }}
+            </div>
+            <h3 class="text-lg font-black text-gray-900 mb-1">{{ title }}</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">{{ body | safe }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── WHAT IT'S USED FOR ───────────────────────────────────────────── #}
+  <div>
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-black text-gray-900">🎯 What Is It Used For?</h2>
+      <p class="text-gray-500 mt-2">TIMWOODIS is both a lens and a toolkit</p>
+    </div>
+
+    {% set uses = [
+      ('🔬','Waste Studies',
+       'Time-observed studies where a leader walks a process and logs every waste type seen '
+       'in real time. Each observation is tagged to a TIMWOODIS category, severity, and step.',
+       '#0053e2','#eff6ff'),
+      ('📋','Failure Mode Analysis',
+       'Structured deep-dives into repeated or high-severity observations. Each failure mode '
+       'gets an RPN score (Risk Priority Number) to rank which wastes to attack first.',
+       '#7c3aed','#f5f3ff'),
+      ('📈','Continuous Improvement',
+       'Trend data over time shows whether waste is growing or shrinking. Leadership can '
+       'compare sites, process paths, and shift patterns to drive targeted kaizen events.',
+       '#2a8703','#f0fdf4'),
+      ('👥','Associate Engagement',
+       'The Intellectual waste category gives every associate a channel to surface ideas. '
+       'Frontline voices are captured as observations — not lost in a suggestion box.',
+       '#be185d','#fdf2f8'),
+      ('🦺','Safety Culture',
+       'Logging safety observations reduces near-misses and incidents over time. '
+       'A safety waste trend going to zero is the goal — and this dashboard shows you the path.',
+       '#ea1100','#fef2f2'),
+      ('📊','Executive Reporting',
+       'Aggregate waste data by site, path, category, and time period. Share exportable '
+       'reports with leadership to prioritise capital, headcount, and process redesign.',
+       '#0891b2','#ecfeff'),
+    ] %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {% for icon, title, desc, color, bg in uses %}
+      <div class="rounded-xl p-6 shadow-sm hover:shadow-md transition" style="background:{{ bg }}">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 shadow-sm"
+             style="background:{{ color }}22">
+          {{ icon }}
+        </div>
+        <h3 class="text-lg font-black text-gray-900 mb-2">{{ title }}</h3>
+        <p class="text-sm text-gray-600 leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── HOW TO GET STARTED ────────────────────────────────────────────── #}
+  <div class="rounded-2xl text-white text-center relative overflow-hidden"
+       style="background:linear-gradient(135deg,#2a8703,#1a6b02);padding:3rem 2rem">
+    <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;
+                border-radius:50%;background:rgba(255,255,255,.07)"></div>
+    <div class="relative" style="z-index:1">
+      <div class="text-5xl mb-4">🚀</div>
+      <h2 class="text-2xl font-black mb-3">Ready to Start Hunting Waste?</h2>
+      <p class="mb-8 mx-auto" style="max-width:480px;opacity:.85">
+        Add your site, create a process path, and run your first TIMWOODIS study.
+        It takes less than 5 minutes to get started.
+      </p>
+      <div class="flex flex-wrap justify-center gap-3">
+        <a href="/sites"
+           class="px-6 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow"
+           style="background:#ffc220;color:#7a3d00">
+          🏭 Add a Site
+        </a>
+        <a href="/paths"
+           class="px-6 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow"
+           style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)">
+          🛤️ Create a Process Path
+        </a>
+        <a href="/studies"
+           class="px-6 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow"
+           style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)">
+          📊 View Studies
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

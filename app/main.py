@@ -69,6 +69,11 @@ async def health():
     return {"status": "OK"}
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about(request: Request):
+    return templates.TemplateResponse("about.html", {"request": request})
+
+
 # ── PWA SYNC ENDPOINTS ───────────────────────────────────────────
 
 class PWAObservation(BaseModel):
